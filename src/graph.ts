@@ -1,20 +1,30 @@
 import { StateGraph, START, END } from "@langchain/langgraph";
 import { GraphState } from "./state.ts";
+import { createCaptureNode } from "./nodes/capture.ts";
+import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
+import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
+import type { Config } from "./config.ts";
 
-const helloNode: typeof GraphState.Node = (_state) => {
-  return { greeting: `Hello from life-agent at ${new Date().toISOString()}` };
-};
+interface GraphDeps {
+  ffmpeg?: FfmpegAdapter;
+}
 
-const goodbyeNode: typeof GraphState.Node = (state) => {
-  return { farewell: `Goodbye! Greeted with: "${state.greeting}"` };
-};
+export function buildGraph(config: Config, deps: GraphDeps = {}) {
+  const ffmpeg = deps.ffmpeg ?? createFfmpegAdapter();
 
-export function buildGraph() {
+  const captureNode = createCaptureNode({
+    ffmpeg,
+    config: {
+      webcamDevice: config.webcamDevice,
+      captureDir: config.captureDir,
+      captureWidth: config.captureWidth,
+      captureHeight: config.captureHeight,
+    },
+  });
+
   return new StateGraph(GraphState)
-    .addNode("hello", helloNode)
-    .addNode("goodbye", goodbyeNode)
-    .addEdge(START, "hello")
-    .addEdge("hello", "goodbye")
-    .addEdge("goodbye", END)
+    .addNode("capture_node", captureNode)
+    .addEdge(START, "capture_node")
+    .addEdge("capture_node", END)
     .compile();
 }

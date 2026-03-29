@@ -1,8 +1,8 @@
 import { loadConfig } from "./config.ts";
 import { buildGraph } from "./graph.ts";
 
-const _config = loadConfig();
-const graph = buildGraph();
+const config = loadConfig();
+const graph = buildGraph(config);
 
 console.log("Running life-agent graph...\n");
 
