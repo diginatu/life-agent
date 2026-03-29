@@ -1,8 +1,15 @@
 import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { loadConfig } from "../src/config.ts";
+import { loadConfig, CONFIG_ENV_KEYS } from "../src/config.ts";
 
 describe("loadConfig", () => {
   const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    // Clear all config-related env vars so defaults are tested
+    for (const key of CONFIG_ENV_KEYS) {
+      delete process.env[key];
+    }
+  });
 
   afterEach(() => {
     // Restore original env

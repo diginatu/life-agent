@@ -16,6 +16,13 @@ const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 
+export const CONFIG_ENV_KEYS = [
+  "WEBCAM_DEVICE", "OLLAMA_MODEL", "OLLAMA_BASE_URL",
+  "LOG_DIR", "CAPTURE_DIR", "CAPTURE_WIDTH", "CAPTURE_HEIGHT",
+  "QUIET_HOURS_START", "QUIET_HOURS_END", "COOLDOWN_MINUTES",
+  "CONFIDENCE_THRESHOLD",
+] as const;
+
 export function loadConfig(): Config {
   return ConfigSchema.parse({
     webcamDevice: process.env.WEBCAM_DEVICE,
