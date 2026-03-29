@@ -4,18 +4,23 @@ import { createCaptureNode } from "./nodes/capture.ts";
 import { createSummarizeNode } from "./nodes/summarize.ts";
 import { createPolicyNode } from "./nodes/policy.ts";
 import { createActionNode } from "./nodes/action.ts";
+import { createMessageNode } from "./nodes/message.ts";
+import { createPersistNode } from "./nodes/persist.ts";
 import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
 import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
 import { createFilesystemAdapter } from "./adapters/filesystem.ts";
+import { createNotifierAdapter } from "./adapters/notifier.ts";
 import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "./adapters/ollama.ts";
 import type { FilesystemAdapter } from "./adapters/filesystem.ts";
+import type { NotifierAdapter } from "./adapters/notifier.ts";
 import type { Config } from "./config.ts";
 
 interface GraphDeps {
   ffmpeg?: FfmpegAdapter;
   ollama?: OllamaAdapter;
   fs?: FilesystemAdapter;
+  notifier?: NotifierAdapter;
   readFileBase64?: (path: string) => Promise<string>;
 }
 
@@ -29,6 +34,7 @@ export function buildGraph(config: Config, deps: GraphDeps = {}) {
   const ffmpeg = deps.ffmpeg ?? createFfmpegAdapter();
   const ollama = deps.ollama ?? createOllamaAdapterFromConfig(config);
   const fs = deps.fs ?? createFilesystemAdapter();
+  const notifier = deps.notifier ?? createNotifierAdapter();
 
   const captureNode = createCaptureNode({
     ffmpeg,
@@ -57,16 +63,22 @@ export function buildGraph(config: Config, deps: GraphDeps = {}) {
   });
 
   const actionNode = createActionNode({ ollama });
+  const messageNode = createMessageNode({ ollama });
+  const persistNode = createPersistNode({ fs, notifier, config: { logDir: config.logDir } });
 
   return new StateGraph(GraphState)
     .addNode("capture_node", captureNode)
     .addNode("summarize_node", summarizeNode)
     .addNode("policy_node", policyNode)
     .addNode("action_node", actionNode)
+    .addNode("message_node", messageNode)
+    .addNode("persist_node", persistNode)
     .addEdge(START, "capture_node")
     .addEdge("capture_node", "summarize_node")
     .addEdge("summarize_node", "policy_node")
     .addEdge("policy_node", "action_node")
-    .addEdge("action_node", END)
+    .addEdge("action_node", "message_node")
+    .addEdge("message_node", "persist_node")
+    .addEdge("persist_node", END)
     .compile();
 }

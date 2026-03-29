@@ -4,6 +4,7 @@ import { loadConfig } from "../src/config.ts";
 import type { FfmpegAdapter } from "../src/adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "../src/adapters/ollama.ts";
 import type { FilesystemAdapter } from "../src/adapters/filesystem.ts";
+import type { NotifierAdapter } from "../src/adapters/notifier.ts";
 
 function mockFfmpeg(success: boolean, stderr = ""): FfmpegAdapter {
   return {
@@ -25,17 +26,29 @@ const validActionJson = JSON.stringify({
   reason: "user has been sitting for a while",
 });
 
-function mockOllama(overrides?: { generate?: string; generateWithImage?: string }): OllamaAdapter {
-  return {
-    generate: async () => overrides?.generate ?? validActionJson,
-    generateWithImage: async () => overrides?.generateWithImage ?? validSummaryJson,
-  };
-}
+const validMessageJson = JSON.stringify({
+  title: "Time for a break!",
+  body: "You've been coding for a while. Stand up and stretch.",
+});
 
-function errorOllama(): OllamaAdapter {
+// generate() is called by action node first, then message node
+// Return action JSON on first call, message JSON on second
+function mockOllama(overrides?: {
+  generateResponses?: string[];
+  generateWithImage?: string;
+  error?: boolean;
+}): OllamaAdapter {
+  if (overrides?.error) {
+    return {
+      generate: async () => { throw new Error("ollama down"); },
+      generateWithImage: async () => { throw new Error("ollama down"); },
+    };
+  }
+  let callIndex = 0;
+  const responses = overrides?.generateResponses ?? [validActionJson, validMessageJson];
   return {
-    generate: async () => { throw new Error("ollama down"); },
-    generateWithImage: async () => { throw new Error("ollama down"); },
+    generate: async () => responses[callIndex++] ?? validActionJson,
+    generateWithImage: async () => overrides?.generateWithImage ?? validSummaryJson,
   };
 }
 
@@ -46,33 +59,37 @@ function mockFs(lastEntries: unknown[] = []): FilesystemAdapter {
   };
 }
 
+function mockNotifier(): NotifierAdapter {
+  return { notify: async () => {} };
+}
+
 const mockReadFile = async () => "fakebase64";
 
 function allMocks(overrides: {
   ffmpegSuccess?: boolean;
   ffmpegStderr?: string;
-  ollamaGenerate?: string;
+  ollamaGenerateResponses?: string[];
   ollamaGenerateWithImage?: string;
   ollamaError?: boolean;
   fsEntries?: unknown[];
 } = {}) {
   return {
     ffmpeg: mockFfmpeg(overrides.ffmpegSuccess ?? true, overrides.ffmpegStderr),
-    ollama: overrides.ollamaError
-      ? errorOllama()
-      : mockOllama({
-          generate: overrides.ollamaGenerate,
-          generateWithImage: overrides.ollamaGenerateWithImage,
-        }),
+    ollama: mockOllama({
+      generateResponses: overrides.ollamaGenerateResponses,
+      generateWithImage: overrides.ollamaGenerateWithImage,
+      error: overrides.ollamaError,
+    }),
     fs: mockFs(overrides.fsEntries ?? []),
+    notifier: mockNotifier(),
     readFileBase64: mockReadFile,
   };
 }
 
-describe("buildGraph (capture + summarize + policy)", () => {
+describe("buildGraph (full pipeline)", () => {
   const config = loadConfig();
 
-  test("happy path: all nodes succeed, action selected", async () => {
+  test("happy path: all 6 nodes succeed, nudge with message", async () => {
     const graph = buildGraph(config, allMocks());
     const result = await graph.invoke({});
 
@@ -82,36 +99,36 @@ describe("buildGraph (capture + summarize + policy)", () => {
     expect(result.policy!.availableActions).toContain("nudge_break");
     expect(result.decision).toBeDefined();
     expect(result.decision!.action).toBe("nudge_break");
+    expect(result.message).toBeDefined();
+    expect(result.message!.title).toBe("Time for a break!");
     expect(result.errors).toEqual([]);
   });
 
-  test("ffmpeg failure: capture fails, action falls back to log_only", async () => {
+  test("ffmpeg failure: degrades gracefully through all nodes", async () => {
     const graph = buildGraph(config, allMocks({ ffmpegSuccess: false, ffmpegStderr: "no camera" }));
     const result = await graph.invoke({});
 
     expect(result.capture).toBeUndefined();
     expect(result.summary).toBeUndefined();
-    expect(result.policy).toBeDefined();
     expect(result.policy!.availableActions).toEqual(["none"]);
-    expect(result.decision).toBeDefined();
     expect(result.decision!.action).toBe("log_only");
+    expect(result.message).toBeNull();
     expect(result.errors.length).toBeGreaterThan(0);
   });
 
-  test("ollama failure: summarize fails, action falls back to log_only", async () => {
+  test("ollama failure: degrades gracefully through all nodes", async () => {
     const graph = buildGraph(config, allMocks({ ollamaError: true }));
     const result = await graph.invoke({});
 
     expect(result.capture).toBeDefined();
     expect(result.summary).toBeUndefined();
-    expect(result.policy).toBeDefined();
     expect(result.policy!.availableActions).toEqual(["none"]);
-    expect(result.decision).toBeDefined();
     expect(result.decision!.action).toBe("log_only");
+    expect(result.message).toBeNull();
     expect(result.errors.some((e: string) => e.includes("ollama"))).toBe(true);
   });
 
-  test("policy restricts on duplicate scene, action constrained", async () => {
+  test("policy restricts on duplicate scene, no nudge message", async () => {
     const lastEntry = {
       timestamp: new Date().toISOString(),
       decision: { action: "log_only" },
@@ -120,11 +137,22 @@ describe("buildGraph (capture + summarize + policy)", () => {
     const graph = buildGraph(config, allMocks({ fsEntries: [lastEntry] }));
     const result = await graph.invoke({});
 
-    expect(result.policy).toBeDefined();
     expect(result.policy!.availableActions).toEqual(["none", "log_only"]);
     expect(result.policy!.reasons.some((r: string) => r.includes("duplicate"))).toBe(true);
-    // Action node should fallback since nudge_break not available
-    expect(result.decision).toBeDefined();
     expect(["none", "log_only"]).toContain(result.decision!.action);
+    expect(result.message).toBeNull();
+  });
+
+  test("log_only action: no message drafted, no notification", async () => {
+    const logOnlyAction = JSON.stringify({
+      action: "log_only",
+      priority: "low",
+      reason: "routine check",
+    });
+    const graph = buildGraph(config, allMocks({ ollamaGenerateResponses: [logOnlyAction] }));
+    const result = await graph.invoke({});
+
+    expect(result.decision!.action).toBe("log_only");
+    expect(result.message).toBeNull();
   });
 });
