@@ -19,10 +19,16 @@ const validSummaryJson = JSON.stringify({
   confidence: 0.85,
 });
 
-function mockOllama(response = validSummaryJson): OllamaAdapter {
+const validActionJson = JSON.stringify({
+  action: "nudge_break",
+  priority: "low",
+  reason: "user has been sitting for a while",
+});
+
+function mockOllama(overrides?: { generate?: string; generateWithImage?: string }): OllamaAdapter {
   return {
-    generate: async () => response,
-    generateWithImage: async () => response,
+    generate: async () => overrides?.generate ?? validActionJson,
+    generateWithImage: async () => overrides?.generateWithImage ?? validSummaryJson,
   };
 }
 
@@ -45,13 +51,19 @@ const mockReadFile = async () => "fakebase64";
 function allMocks(overrides: {
   ffmpegSuccess?: boolean;
   ffmpegStderr?: string;
-  ollamaResponse?: string;
+  ollamaGenerate?: string;
+  ollamaGenerateWithImage?: string;
   ollamaError?: boolean;
   fsEntries?: unknown[];
 } = {}) {
   return {
     ffmpeg: mockFfmpeg(overrides.ffmpegSuccess ?? true, overrides.ffmpegStderr),
-    ollama: overrides.ollamaError ? errorOllama() : mockOllama(overrides.ollamaResponse),
+    ollama: overrides.ollamaError
+      ? errorOllama()
+      : mockOllama({
+          generate: overrides.ollamaGenerate,
+          generateWithImage: overrides.ollamaGenerateWithImage,
+        }),
     fs: mockFs(overrides.fsEntries ?? []),
     readFileBase64: mockReadFile,
   };
@@ -60,7 +72,7 @@ function allMocks(overrides: {
 describe("buildGraph (capture + summarize + policy)", () => {
   const config = loadConfig();
 
-  test("happy path: all nodes succeed, policy allows", async () => {
+  test("happy path: all nodes succeed, action selected", async () => {
     const graph = buildGraph(config, allMocks());
     const result = await graph.invoke({});
 
@@ -68,10 +80,12 @@ describe("buildGraph (capture + summarize + policy)", () => {
     expect(result.summary).toBeDefined();
     expect(result.policy).toBeDefined();
     expect(result.policy!.availableActions).toContain("nudge_break");
+    expect(result.decision).toBeDefined();
+    expect(result.decision!.action).toBe("nudge_break");
     expect(result.errors).toEqual([]);
   });
 
-  test("ffmpeg failure: capture fails, policy restricts to none", async () => {
+  test("ffmpeg failure: capture fails, action falls back to log_only", async () => {
     const graph = buildGraph(config, allMocks({ ffmpegSuccess: false, ffmpegStderr: "no camera" }));
     const result = await graph.invoke({});
 
@@ -79,10 +93,12 @@ describe("buildGraph (capture + summarize + policy)", () => {
     expect(result.summary).toBeUndefined();
     expect(result.policy).toBeDefined();
     expect(result.policy!.availableActions).toEqual(["none"]);
+    expect(result.decision).toBeDefined();
+    expect(result.decision!.action).toBe("log_only");
     expect(result.errors.length).toBeGreaterThan(0);
   });
 
-  test("ollama failure: summarize fails, policy restricts to none", async () => {
+  test("ollama failure: summarize fails, action falls back to log_only", async () => {
     const graph = buildGraph(config, allMocks({ ollamaError: true }));
     const result = await graph.invoke({});
 
@@ -90,10 +106,12 @@ describe("buildGraph (capture + summarize + policy)", () => {
     expect(result.summary).toBeUndefined();
     expect(result.policy).toBeDefined();
     expect(result.policy!.availableActions).toEqual(["none"]);
+    expect(result.decision).toBeDefined();
+    expect(result.decision!.action).toBe("log_only");
     expect(result.errors.some((e: string) => e.includes("ollama"))).toBe(true);
   });
 
-  test("policy restricts on duplicate scene", async () => {
+  test("policy restricts on duplicate scene, action constrained", async () => {
     const lastEntry = {
       timestamp: new Date().toISOString(),
       decision: { action: "log_only" },
@@ -105,5 +123,8 @@ describe("buildGraph (capture + summarize + policy)", () => {
     expect(result.policy).toBeDefined();
     expect(result.policy!.availableActions).toEqual(["none", "log_only"]);
     expect(result.policy!.reasons.some((r: string) => r.includes("duplicate"))).toBe(true);
+    // Action node should fallback since nudge_break not available
+    expect(result.decision).toBeDefined();
+    expect(["none", "log_only"]).toContain(result.decision!.action);
   });
 });

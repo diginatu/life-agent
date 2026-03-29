@@ -3,6 +3,7 @@ import { GraphState } from "./state.ts";
 import { createCaptureNode } from "./nodes/capture.ts";
 import { createSummarizeNode } from "./nodes/summarize.ts";
 import { createPolicyNode } from "./nodes/policy.ts";
+import { createActionNode } from "./nodes/action.ts";
 import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
 import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
 import { createFilesystemAdapter } from "./adapters/filesystem.ts";
@@ -55,13 +56,17 @@ export function buildGraph(config: Config, deps: GraphDeps = {}) {
     },
   });
 
+  const actionNode = createActionNode({ ollama });
+
   return new StateGraph(GraphState)
     .addNode("capture_node", captureNode)
     .addNode("summarize_node", summarizeNode)
     .addNode("policy_node", policyNode)
+    .addNode("action_node", actionNode)
     .addEdge(START, "capture_node")
     .addEdge("capture_node", "summarize_node")
     .addEdge("summarize_node", "policy_node")
-    .addEdge("policy_node", END)
+    .addEdge("policy_node", "action_node")
+    .addEdge("action_node", END)
     .compile();
 }
