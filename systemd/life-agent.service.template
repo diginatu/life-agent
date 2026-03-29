@@ -1,0 +1,24 @@
+[Unit]
+Description=Life Agent — periodic webcam snapshot + LLM reasoning
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory={{PROJECT_DIR}}
+EnvironmentFile={{PROJECT_DIR}}/.env
+ExecStart={{BUN_PATH}} run src/index.ts
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=life-agent
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths={{PROJECT_DIR}}/logs {{PROJECT_DIR}}/captures
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

@@ -25,6 +25,13 @@ captures/
 .env.production.local
 .env.local
 
+# generated systemd units (install.sh creates these from templates)
+systemd/life-agent.service
+systemd/life-agent.timer
+
+# test temp files
+.test-tmp/
+
 # caches
 .eslintcache
 .cache

@@ -1,14 +1,16 @@
 import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { createFilesystemAdapter } from "../../src/adapters/filesystem.ts";
+
+const TEST_TMP_BASE = resolve(import.meta.dir, "../../.test-tmp");
 
 describe("FilesystemAdapter", () => {
   let dir: string;
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "life-agent-test-"));
+    await mkdir(TEST_TMP_BASE, { recursive: true });
+    dir = await mkdtemp(join(TEST_TMP_BASE, "fs-test-"));
   });
 
   afterEach(async () => {
