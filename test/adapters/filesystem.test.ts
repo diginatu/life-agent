@@ -1,0 +1,101 @@
+import { test, expect, describe, beforeEach, afterEach } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { createFilesystemAdapter } from "../../src/adapters/filesystem.ts";
+
+describe("FilesystemAdapter", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "life-agent-test-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true });
+  });
+
+  describe("appendJsonLine", () => {
+    test("creates file and writes one line", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-03-29", { hello: "world" });
+
+      const file = Bun.file(join(dir, "2026-03-29.jsonl"));
+      const content = await file.text();
+      expect(content).toBe('{"hello":"world"}\n');
+    });
+
+    test("appends multiple lines to same file", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-03-29", { a: 1 });
+      await adapter.appendJsonLine(dir, "2026-03-29", { b: 2 });
+      await adapter.appendJsonLine(dir, "2026-03-29", { c: 3 });
+
+      const file = Bun.file(join(dir, "2026-03-29.jsonl"));
+      const content = await file.text();
+      const lines = content.trim().split("\n");
+      expect(lines).toHaveLength(3);
+      expect(JSON.parse(lines[0]!)).toEqual({ a: 1 });
+      expect(JSON.parse(lines[2]!)).toEqual({ c: 3 });
+    });
+
+    test("writes to different date files", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-03-28", { day: 28 });
+      await adapter.appendJsonLine(dir, "2026-03-29", { day: 29 });
+
+      const file28 = Bun.file(join(dir, "2026-03-28.jsonl"));
+      const file29 = Bun.file(join(dir, "2026-03-29.jsonl"));
+      expect(await file28.exists()).toBe(true);
+      expect(await file29.exists()).toBe(true);
+    });
+
+    test("creates directory if it does not exist", async () => {
+      const adapter = createFilesystemAdapter();
+      const nestedDir = join(dir, "subdir", "logs");
+      await adapter.appendJsonLine(nestedDir, "2026-03-29", { nested: true });
+
+      const file = Bun.file(join(nestedDir, "2026-03-29.jsonl"));
+      expect(await file.exists()).toBe(true);
+    });
+  });
+
+  describe("readLastNLines", () => {
+    test("returns empty array for non-existent file", async () => {
+      const adapter = createFilesystemAdapter();
+      const result = await adapter.readLastNLines(dir, "2026-01-01", 5);
+      expect(result).toEqual([]);
+    });
+
+    test("returns last N parsed JSON objects", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-03-29", { i: 1 });
+      await adapter.appendJsonLine(dir, "2026-03-29", { i: 2 });
+      await adapter.appendJsonLine(dir, "2026-03-29", { i: 3 });
+      await adapter.appendJsonLine(dir, "2026-03-29", { i: 4 });
+
+      const result = await adapter.readLastNLines(dir, "2026-03-29", 2);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ i: 3 });
+      expect(result[1]).toEqual({ i: 4 });
+    });
+
+    test("returns all lines when fewer than N exist", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-03-29", { only: "one" });
+
+      const result = await adapter.readLastNLines(dir, "2026-03-29", 5);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({ only: "one" });
+    });
+
+    test("skips empty lines", async () => {
+      const adapter = createFilesystemAdapter();
+      const filePath = join(dir, "2026-03-29.jsonl");
+      await Bun.write(filePath, '{"a":1}\n\n{"b":2}\n\n');
+
+      const result = await adapter.readLastNLines(dir, "2026-03-29", 5);
+      expect(result).toHaveLength(2);
+    });
+  });
+});

@@ -3,6 +3,7 @@ import { buildGraph } from "../src/graph.ts";
 import { loadConfig } from "../src/config.ts";
 import type { FfmpegAdapter } from "../src/adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "../src/adapters/ollama.ts";
+import type { FilesystemAdapter } from "../src/adapters/filesystem.ts";
 
 function mockFfmpeg(success: boolean, stderr = ""): FfmpegAdapter {
   return {
@@ -32,50 +33,77 @@ function errorOllama(): OllamaAdapter {
   };
 }
 
+function mockFs(lastEntries: unknown[] = []): FilesystemAdapter {
+  return {
+    appendJsonLine: async () => {},
+    readLastNLines: async () => lastEntries,
+  };
+}
+
 const mockReadFile = async () => "fakebase64";
 
-describe("buildGraph (capture + summarize)", () => {
+function allMocks(overrides: {
+  ffmpegSuccess?: boolean;
+  ffmpegStderr?: string;
+  ollamaResponse?: string;
+  ollamaError?: boolean;
+  fsEntries?: unknown[];
+} = {}) {
+  return {
+    ffmpeg: mockFfmpeg(overrides.ffmpegSuccess ?? true, overrides.ffmpegStderr),
+    ollama: overrides.ollamaError ? errorOllama() : mockOllama(overrides.ollamaResponse),
+    fs: mockFs(overrides.fsEntries ?? []),
+    readFileBase64: mockReadFile,
+  };
+}
+
+describe("buildGraph (capture + summarize + policy)", () => {
   const config = loadConfig();
 
-  test("happy path: capture + summarize both succeed", async () => {
-    const graph = buildGraph(config, {
-      ffmpeg: mockFfmpeg(true),
-      ollama: mockOllama(),
-      readFileBase64: mockReadFile,
-    });
+  test("happy path: all nodes succeed, policy allows", async () => {
+    const graph = buildGraph(config, allMocks());
     const result = await graph.invoke({});
 
     expect(result.capture).toBeDefined();
     expect(result.summary).toBeDefined();
-    expect(result.summary!.personPresent).toBe(true);
-    expect(result.summary!.confidence).toBe(0.85);
+    expect(result.policy).toBeDefined();
+    expect(result.policy!.availableActions).toContain("nudge_break");
     expect(result.errors).toEqual([]);
   });
 
-  test("ffmpeg failure: no capture, summarize gets error", async () => {
-    const graph = buildGraph(config, {
-      ffmpeg: mockFfmpeg(false, "no camera"),
-      ollama: mockOllama(),
-      readFileBase64: mockReadFile,
-    });
+  test("ffmpeg failure: capture fails, policy restricts to none", async () => {
+    const graph = buildGraph(config, allMocks({ ffmpegSuccess: false, ffmpegStderr: "no camera" }));
     const result = await graph.invoke({});
 
     expect(result.capture).toBeUndefined();
     expect(result.summary).toBeUndefined();
+    expect(result.policy).toBeDefined();
+    expect(result.policy!.availableActions).toEqual(["none"]);
     expect(result.errors.length).toBeGreaterThan(0);
   });
 
-  test("ollama failure: capture succeeds, summarize fails gracefully", async () => {
-    const graph = buildGraph(config, {
-      ffmpeg: mockFfmpeg(true),
-      ollama: errorOllama(),
-      readFileBase64: mockReadFile,
-    });
+  test("ollama failure: summarize fails, policy restricts to none", async () => {
+    const graph = buildGraph(config, allMocks({ ollamaError: true }));
     const result = await graph.invoke({});
 
     expect(result.capture).toBeDefined();
     expect(result.summary).toBeUndefined();
-    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.policy).toBeDefined();
+    expect(result.policy!.availableActions).toEqual(["none"]);
     expect(result.errors.some((e: string) => e.includes("ollama"))).toBe(true);
+  });
+
+  test("policy restricts on duplicate scene", async () => {
+    const lastEntry = {
+      timestamp: new Date().toISOString(),
+      decision: { action: "log_only" },
+      summary: { scene: "desk with monitor", activityGuess: "coding" },
+    };
+    const graph = buildGraph(config, allMocks({ fsEntries: [lastEntry] }));
+    const result = await graph.invoke({});
+
+    expect(result.policy).toBeDefined();
+    expect(result.policy!.availableActions).toEqual(["none", "log_only"]);
+    expect(result.policy!.reasons.some((r: string) => r.includes("duplicate"))).toBe(true);
   });
 });

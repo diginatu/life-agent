@@ -2,15 +2,19 @@ import { StateGraph, START, END } from "@langchain/langgraph";
 import { GraphState } from "./state.ts";
 import { createCaptureNode } from "./nodes/capture.ts";
 import { createSummarizeNode } from "./nodes/summarize.ts";
+import { createPolicyNode } from "./nodes/policy.ts";
 import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
 import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
+import { createFilesystemAdapter } from "./adapters/filesystem.ts";
 import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "./adapters/ollama.ts";
+import type { FilesystemAdapter } from "./adapters/filesystem.ts";
 import type { Config } from "./config.ts";
 
 interface GraphDeps {
   ffmpeg?: FfmpegAdapter;
   ollama?: OllamaAdapter;
+  fs?: FilesystemAdapter;
   readFileBase64?: (path: string) => Promise<string>;
 }
 
@@ -23,6 +27,7 @@ async function readFileBase64(path: string): Promise<string> {
 export function buildGraph(config: Config, deps: GraphDeps = {}) {
   const ffmpeg = deps.ffmpeg ?? createFfmpegAdapter();
   const ollama = deps.ollama ?? createOllamaAdapterFromConfig(config);
+  const fs = deps.fs ?? createFilesystemAdapter();
 
   const captureNode = createCaptureNode({
     ffmpeg,
@@ -39,11 +44,24 @@ export function buildGraph(config: Config, deps: GraphDeps = {}) {
     readFileBase64: deps.readFileBase64 ?? readFileBase64,
   });
 
+  const policyNode = createPolicyNode({
+    fs,
+    config: {
+      quietHoursStart: config.quietHoursStart,
+      quietHoursEnd: config.quietHoursEnd,
+      cooldownMinutes: config.cooldownMinutes,
+      confidenceThreshold: config.confidenceThreshold,
+      logDir: config.logDir,
+    },
+  });
+
   return new StateGraph(GraphState)
     .addNode("capture_node", captureNode)
     .addNode("summarize_node", summarizeNode)
+    .addNode("policy_node", policyNode)
     .addEdge(START, "capture_node")
     .addEdge("capture_node", "summarize_node")
-    .addEdge("summarize_node", END)
+    .addEdge("summarize_node", "policy_node")
+    .addEdge("policy_node", END)
     .compile();
 }

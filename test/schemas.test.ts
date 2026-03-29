@@ -98,30 +98,53 @@ describe("SceneSummarySchema", () => {
 });
 
 describe("PolicyDecisionSchema", () => {
-  test("accepts valid policy decision", () => {
+  test("accepts valid policy decision with all actions available", () => {
     const result = PolicyDecisionSchema.parse({
-      allowed: true,
+      availableActions: ["none", "log_only", "nudge_break", "nudge_sleep"],
       cooldownBlocked: false,
       quietHoursBlocked: false,
       reasons: [],
     });
-    expect(result.allowed).toBe(true);
+    expect(result.availableActions).toHaveLength(4);
     expect(result.reasons).toEqual([]);
   });
 
-  test("accepts policy with reasons", () => {
+  test("accepts restricted actions with reasons", () => {
     const result = PolicyDecisionSchema.parse({
-      allowed: false,
+      availableActions: ["none", "log_only"],
       cooldownBlocked: true,
       quietHoursBlocked: false,
       reasons: ["cooldown active: last action 5 min ago"],
     });
+    expect(result.availableActions).toHaveLength(2);
     expect(result.reasons).toHaveLength(1);
   });
 
-  test("rejects missing allowed field", () => {
+  test("rejects empty availableActions", () => {
     expect(() =>
       PolicyDecisionSchema.parse({
+        availableActions: [],
+        cooldownBlocked: false,
+        quietHoursBlocked: false,
+        reasons: [],
+      })
+    ).toThrow();
+  });
+
+  test("rejects missing availableActions field", () => {
+    expect(() =>
+      PolicyDecisionSchema.parse({
+        cooldownBlocked: false,
+        quietHoursBlocked: false,
+        reasons: [],
+      })
+    ).toThrow();
+  });
+
+  test("rejects invalid action in availableActions", () => {
+    expect(() =>
+      PolicyDecisionSchema.parse({
+        availableActions: ["none", "invalid_action"],
         cooldownBlocked: false,
         quietHoursBlocked: false,
         reasons: [],
@@ -202,7 +225,7 @@ describe("LogEntrySchema", () => {
       confidence: 0.8,
     },
     policy: {
-      allowed: true,
+      availableActions: ["none", "log_only", "nudge_break", "nudge_sleep"] as const,
       cooldownBlocked: false,
       quietHoursBlocked: false,
       reasons: [],
