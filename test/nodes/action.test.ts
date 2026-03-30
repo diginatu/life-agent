@@ -154,6 +154,34 @@ describe("action node", () => {
     expect(capturedPrompt).toContain("coding");
   });
 
+  test("includes current time in prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      now: () => new Date("2026-03-31T23:45:00"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("23:45");
+    expect(capturedPrompt).toContain("Tuesday");
+  });
+
+  test("default now() works when not provided", async () => {
+    const node = createActionNode({ ollama: mockOllama(), actionsConfig });
+    const result = await node(makeState());
+
+    expect(result.decision).toBeDefined();
+    expect(result.errors).toBeUndefined();
+  });
+
   test("includes action descriptions from config in prompt", async () => {
     let capturedPrompt = "";
     const capturingOllama: OllamaAdapter = {

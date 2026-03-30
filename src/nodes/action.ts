@@ -7,6 +7,7 @@ import type { Config } from "../config.ts";
 interface ActionNodeDeps {
   ollama: OllamaAdapter;
   actionsConfig: Config;
+  now?: () => Date;
 }
 
 interface ActionNodeState {
@@ -33,7 +34,18 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config): string {
+function formatTime(date: Date): string {
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const dayOfWeek = days[date.getDay()];
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${dayOfWeek}, ${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}
+
+function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config, currentTime: Date): string {
   const actionDescriptions = policy.availableActions
     .map((a) => {
       const desc = actionsConfig.getDescription(a);
@@ -49,6 +61,9 @@ Scene analysis:
 - Scene: ${summary.scene}
 - Activity: ${summary.activityGuess ?? "unknown"}
 - Confidence: ${summary.confidence}
+
+Current time:
+- ${formatTime(currentTime)}
 
 Available actions:
 ${actionDescriptions}
@@ -82,7 +97,8 @@ export function createActionNode(deps: ActionNodeDeps) {
       };
     }
 
-    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig);
+    const now = deps.now ?? (() => new Date());
+    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig, now());
 
     let rawResponse: string;
     try {
