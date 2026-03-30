@@ -18,6 +18,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # captures
 captures/
 
+# local config (created by install.sh)
+config.local.yml
+
 # dotenv environment variable files
 .env
 .env.development.local

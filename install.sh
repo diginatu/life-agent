@@ -26,6 +26,12 @@ sed -e "s|{{PROJECT_DIR}}|${PROJECT_DIR}|g" \
 cp "${PROJECT_DIR}/systemd/life-agent.timer.template" \
    "${SYSTEMD_USER_DIR}/life-agent.timer"
 
+# Create local config if it doesn't exist
+if [ ! -f "${PROJECT_DIR}/config.local.yml" ]; then
+  cp "${PROJECT_DIR}/config.yml" "${PROJECT_DIR}/config.local.yml"
+  echo "Created config.local.yml — edit it to customize settings for this machine."
+fi
+
 # Reload and enable
 systemctl --user daemon-reload
 systemctl --user enable --now life-agent.timer

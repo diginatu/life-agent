@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory={{PROJECT_DIR}}
-ExecStart={{BUN_PATH}} run src/index.ts
+ExecStart={{BUN_PATH}} run src/index.ts --config {{PROJECT_DIR}}/config.local.yml
 
 # Logging
 StandardOutput=journal
