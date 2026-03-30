@@ -1,11 +1,7 @@
 import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { PolicyDecision } from "../schemas/policy.ts";
-import type { Action } from "../schemas/action.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
-
-const ALL_ACTIONS: Action[] = ["none", "log_only", "nudge_break", "nudge_sleep"];
-const PASSIVE_ACTIONS: Action[] = ["none", "log_only"];
-const NONE_ONLY: Action[] = ["none"];
+import type { Config } from "../config.ts";
 
 interface PolicyConfig {
   quietHoursStart: number;
@@ -18,6 +14,7 @@ interface PolicyConfig {
 interface PolicyNodeDeps {
   fs: FilesystemAdapter;
   config: PolicyConfig;
+  actionsConfig: Config;
   now?: () => Date;
 }
 
@@ -30,8 +27,6 @@ interface PolicyNodeResult {
   errors?: string[];
 }
 
-const ACTIVE_ACTIONS = new Set(["nudge_break", "nudge_sleep"]);
-
 function isInQuietHours(hour: number, start: number, end: number): boolean {
   if (start > end) {
     return hour >= start || hour < end;
@@ -40,13 +35,16 @@ function isInQuietHours(hour: number, start: number, end: number): boolean {
 }
 
 export function createPolicyNode(deps: PolicyNodeDeps) {
-  const { fs, config, now = () => new Date() } = deps;
+  const { fs, config, actionsConfig, now = () => new Date() } = deps;
+  const allActions = actionsConfig.getActionNames();
+  const passiveActions = actionsConfig.getPassiveActions();
+  const noneOnly = ["none"];
 
   return async (state: PolicyNodeState): Promise<PolicyNodeResult> => {
     if (!state.summary) {
       return {
         policy: {
-          availableActions: NONE_ONLY,
+          availableActions: noneOnly,
           cooldownBlocked: false,
           quietHoursBlocked: false,
           reasons: ["no summary data"],
@@ -80,14 +78,14 @@ export function createPolicyNode(deps: PolicyNodeDeps) {
       lastEntries = [];
     }
 
-    // Cooldown check: only for active actions (nudge_break, nudge_sleep)
+    // Cooldown check: only for active actions
     let cooldownBlocked = false;
     if (lastEntries.length > 0) {
       const lastEntry = lastEntries[lastEntries.length - 1] as Record<string, unknown>;
       const lastAction = (lastEntry.decision as Record<string, unknown>)?.action as string | undefined;
       const lastTimestamp = lastEntry.timestamp as string | undefined;
 
-      if (lastAction && ACTIVE_ACTIONS.has(lastAction) && lastTimestamp) {
+      if (lastAction && actionsConfig.isActiveAction(lastAction) && lastTimestamp) {
         const elapsed = currentTime.getTime() - new Date(lastTimestamp).getTime();
         const elapsedMinutes = elapsed / (1000 * 60);
         if (elapsedMinutes < config.cooldownMinutes) {
@@ -120,7 +118,7 @@ export function createPolicyNode(deps: PolicyNodeDeps) {
 
     return {
       policy: {
-        availableActions: restricted ? PASSIVE_ACTIONS : ALL_ACTIONS,
+        availableActions: restricted ? passiveActions : allActions,
         cooldownBlocked,
         quietHoursBlocked,
         reasons,

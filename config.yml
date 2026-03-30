@@ -1,0 +1,52 @@
+# Life Agent Configuration
+
+settings:
+  # Webcam device path
+  webcamDevice: /dev/video0
+
+  # Ollama configuration
+  ollamaModel: gemma3:12b
+  ollamaBaseUrl: http://localhost:11434
+
+  # Output directories
+  logDir: ./logs
+  captureDir: ./captures
+
+  # Capture resolution
+  captureWidth: 640
+  captureHeight: 480
+
+  # Quiet hours (24h format) — no active nudges during this window
+  quietHoursStart: 23
+  quietHoursEnd: 7
+
+  # Minimum minutes between nudge notifications
+  cooldownMinutes: 30
+
+  # Minimum confidence to consider acting
+  confidenceThreshold: 0.3
+
+# Action definitions
+# - active: true = triggers desktop notification; false = log-only
+# - description: context given to the LLM when selecting actions
+# - fallback: notification shown when LLM message drafting fails (required for active actions)
+actions:
+  none:
+    active: false
+
+  log_only:
+    active: false
+
+  nudge_break:
+    active: true
+    description: Suggest the user take a short break from work
+    fallback:
+      title: Time for a break
+      body: You've been working for a while. Consider standing up and stretching.
+
+  nudge_sleep:
+    active: true
+    description: Suggest the user go to sleep when it's late
+    fallback:
+      title: Time to wind down
+      body: It's getting late. Consider wrapping up and heading to bed.

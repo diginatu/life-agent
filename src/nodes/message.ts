@@ -2,9 +2,11 @@ import type { OllamaAdapter } from "../adapters/ollama.ts";
 import { DraftMessageSchema, type DraftMessage } from "../schemas/message.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { ActionSelection } from "../schemas/action.ts";
+import type { Config } from "../config.ts";
 
 interface MessageNodeDeps {
   ollama: OllamaAdapter;
+  actionsConfig: Config;
 }
 
 interface MessageNodeState {
@@ -16,19 +18,6 @@ interface MessageNodeResult {
   message?: DraftMessage | null;
   errors?: string[];
 }
-
-const PASSIVE_ACTIONS = new Set(["none", "log_only"]);
-
-const FALLBACK_MESSAGES: Record<string, DraftMessage> = {
-  nudge_break: {
-    title: "Time for a break",
-    body: "You've been working for a while. Consider standing up and stretching.",
-  },
-  nudge_sleep: {
-    title: "Time to wind down",
-    body: "It's getting late. Consider wrapping up and heading to bed.",
-  },
-};
 
 function extractJson(text: string): string {
   const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
@@ -58,18 +47,25 @@ Return ONLY the JSON object, no other text.`;
 }
 
 export function createMessageNode(deps: MessageNodeDeps) {
+  const { actionsConfig } = deps;
+
+  function getFallback(action: string): DraftMessage {
+    return actionsConfig.getFallbackMessage(action)
+      ?? { title: "Notification", body: "Life Agent has a suggestion for you." };
+  }
+
   return async (state: MessageNodeState): Promise<MessageNodeResult> => {
     if (!state.decision) {
       return { message: null, errors: ["message: no decision data in state"] };
     }
 
-    if (PASSIVE_ACTIONS.has(state.decision.action)) {
+    if (!actionsConfig.isActiveAction(state.decision.action)) {
       return { message: null };
     }
 
     if (!state.summary) {
       return {
-        message: FALLBACK_MESSAGES[state.decision.action] ?? FALLBACK_MESSAGES.nudge_break!,
+        message: getFallback(state.decision.action),
         errors: ["message: no summary data, using fallback message"],
       };
     }
@@ -83,7 +79,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       const msg = `message: ollama error: ${err instanceof Error ? err.message : String(err)}`;
       console.error(msg);
       return {
-        message: FALLBACK_MESSAGES[state.decision.action] ?? FALLBACK_MESSAGES.nudge_break!,
+        message: getFallback(state.decision.action),
         errors: [msg],
       };
     }
@@ -97,7 +93,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       const msg = `message: failed to parse JSON: ${jsonStr.slice(0, 200)}`;
       console.error(msg);
       return {
-        message: FALLBACK_MESSAGES[state.decision.action] ?? FALLBACK_MESSAGES.nudge_break!,
+        message: getFallback(state.decision.action),
         errors: [msg],
       };
     }
@@ -107,7 +103,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       const msg = `message: schema validation failed: ${JSON.stringify(result.error.issues)}`;
       console.error(msg);
       return {
-        message: FALLBACK_MESSAGES[state.decision.action] ?? FALLBACK_MESSAGES.nudge_break!,
+        message: getFallback(state.decision.action),
         errors: [msg],
       };
     }

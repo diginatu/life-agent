@@ -6,7 +6,6 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory={{PROJECT_DIR}}
-EnvironmentFile={{PROJECT_DIR}}/.env
 ExecStart={{BUN_PATH}} run src/index.ts
 
 # Logging

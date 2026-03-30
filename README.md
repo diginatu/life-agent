@@ -16,9 +16,8 @@ LifeAgent is a local-first personal life assistant that captures periodic webcam
 # Install dependencies
 bun install
 
-# Copy and edit environment config
-cp .env.example .env
-# Edit .env to match your setup (defaults work for most cases)
+# Edit config (defaults work for most cases)
+# See config.yml for all settings and action definitions
 ```
 
 ## Usage
@@ -64,21 +63,21 @@ To uninstall:
 
 ## Configuration
 
-All settings are configured via environment variables (see `.env.example`):
+All settings and actions are defined in `config.yml`. Use `--config <path>` to specify a different config file.
 
-| Variable | Default | Description |
-|---|---|---|
-| `WEBCAM_DEVICE` | `/dev/video0` | Webcam device path |
-| `OLLAMA_MODEL` | `gemma3:12b` | Ollama model name |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API URL |
-| `LOG_DIR` | `./logs` | JSONL log output directory |
-| `CAPTURE_DIR` | `./captures` | Webcam frame output directory |
-| `CAPTURE_WIDTH` | `640` | Capture width in pixels |
-| `CAPTURE_HEIGHT` | `480` | Capture height in pixels |
-| `QUIET_HOURS_START` | `23` | Start of quiet hours (24h) |
-| `QUIET_HOURS_END` | `7` | End of quiet hours (24h) |
-| `COOLDOWN_MINUTES` | `30` | Minimum minutes between nudges |
-| `CONFIDENCE_THRESHOLD` | `0.3` | Minimum confidence to act |
+To add a custom action (e.g. hydration reminder), just add it to `config.yml`:
+
+```yaml
+actions:
+  nudge_hydrate:
+    active: true
+    description: Remind the user to drink water
+    fallback:
+      title: Stay hydrated
+      body: Time to drink some water.
+```
+
+See `config.yml` for all available settings and their defaults.
 
 ## Pipeline
 

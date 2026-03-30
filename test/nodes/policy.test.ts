@@ -2,6 +2,7 @@ import { test, expect, describe } from "bun:test";
 import { createPolicyNode } from "../../src/nodes/policy.ts";
 import { PolicyDecisionSchema } from "../../src/schemas/policy.ts";
 import type { FilesystemAdapter } from "../../src/adapters/filesystem.ts";
+import { mockActionsConfig } from "../helpers/mock-config.ts";
 
 function mockFs(lastEntries: unknown[] = []): FilesystemAdapter {
   return {
@@ -17,6 +18,8 @@ const defaultConfig = {
   confidenceThreshold: 0.3,
   logDir: "./logs",
 };
+
+const actionsConfig = mockActionsConfig();
 
 const baseSummary = {
   personPresent: true,
@@ -38,6 +41,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs(),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T02:00:00.000Z"),
       });
 
@@ -51,6 +55,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs(),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 
@@ -63,6 +68,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs(),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T23:00:00.000Z"),
       });
 
@@ -75,6 +81,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs(),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T07:00:00.000Z"),
       });
 
@@ -92,6 +99,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs([recentEntry]),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 
@@ -108,6 +116,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs([oldEntry]),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 
@@ -123,6 +132,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs([recentLogOnly]),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 
@@ -134,6 +144,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs([]),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 
@@ -148,6 +159,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs(),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 
@@ -160,6 +172,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs(),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 
@@ -181,6 +194,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs([lastEntry]),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 
@@ -201,6 +215,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs([lastEntry]),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 
@@ -214,6 +229,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs(),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 
@@ -227,6 +243,7 @@ describe("policy node", () => {
       const node = createPolicyNode({
         fs: mockFs(),
         config: defaultConfig,
+        actionsConfig,
         now: () => new Date("2026-03-29T14:00:00.000Z"),
       });
 

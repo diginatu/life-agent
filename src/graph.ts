@@ -31,18 +31,19 @@ async function readFileBase64(path: string): Promise<string> {
 }
 
 export function buildGraph(config: Config, deps: GraphDeps = {}) {
+  const s = config.settings;
   const ffmpeg = deps.ffmpeg ?? createFfmpegAdapter();
-  const ollama = deps.ollama ?? createOllamaAdapterFromConfig(config);
+  const ollama = deps.ollama ?? createOllamaAdapterFromConfig(s);
   const fs = deps.fs ?? createFilesystemAdapter();
   const notifier = deps.notifier ?? createNotifierAdapter();
 
   const captureNode = createCaptureNode({
     ffmpeg,
     config: {
-      webcamDevice: config.webcamDevice,
-      captureDir: config.captureDir,
-      captureWidth: config.captureWidth,
-      captureHeight: config.captureHeight,
+      webcamDevice: s.webcamDevice,
+      captureDir: s.captureDir,
+      captureWidth: s.captureWidth,
+      captureHeight: s.captureHeight,
     },
   });
 
@@ -54,17 +55,23 @@ export function buildGraph(config: Config, deps: GraphDeps = {}) {
   const policyNode = createPolicyNode({
     fs,
     config: {
-      quietHoursStart: config.quietHoursStart,
-      quietHoursEnd: config.quietHoursEnd,
-      cooldownMinutes: config.cooldownMinutes,
-      confidenceThreshold: config.confidenceThreshold,
-      logDir: config.logDir,
+      quietHoursStart: s.quietHoursStart,
+      quietHoursEnd: s.quietHoursEnd,
+      cooldownMinutes: s.cooldownMinutes,
+      confidenceThreshold: s.confidenceThreshold,
+      logDir: s.logDir,
     },
+    actionsConfig: config,
   });
 
   const actionNode = createActionNode({ ollama });
-  const messageNode = createMessageNode({ ollama });
-  const persistNode = createPersistNode({ fs, notifier, config: { logDir: config.logDir } });
+  const messageNode = createMessageNode({ ollama, actionsConfig: config });
+  const persistNode = createPersistNode({
+    fs,
+    notifier,
+    config: { logDir: s.logDir },
+    actionsConfig: config,
+  });
 
   return new StateGraph(GraphState)
     .addNode("capture_node", captureNode)

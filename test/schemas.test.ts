@@ -2,7 +2,7 @@ import { test, expect, describe } from "bun:test";
 import { CaptureResultSchema } from "../src/schemas/capture.ts";
 import { SceneSummarySchema } from "../src/schemas/summary.ts";
 import { PolicyDecisionSchema } from "../src/schemas/policy.ts";
-import { ActionEnum, ActionSelectionSchema } from "../src/schemas/action.ts";
+import { ActionSelectionSchema } from "../src/schemas/action.ts";
 import { DraftMessageSchema } from "../src/schemas/message.ts";
 import { LogEntrySchema } from "../src/schemas/log-entry.ts";
 
@@ -141,29 +141,14 @@ describe("PolicyDecisionSchema", () => {
     ).toThrow();
   });
 
-  test("rejects invalid action in availableActions", () => {
-    expect(() =>
-      PolicyDecisionSchema.parse({
-        availableActions: ["none", "invalid_action"],
-        cooldownBlocked: false,
-        quietHoursBlocked: false,
-        reasons: [],
-      })
-    ).toThrow();
-  });
-});
-
-describe("ActionEnum", () => {
-  test("accepts valid actions", () => {
-    expect(ActionEnum.parse("none")).toBe("none");
-    expect(ActionEnum.parse("log_only")).toBe("log_only");
-    expect(ActionEnum.parse("nudge_break")).toBe("nudge_break");
-    expect(ActionEnum.parse("nudge_sleep")).toBe("nudge_sleep");
-  });
-
-  test("rejects invalid action", () => {
-    expect(() => ActionEnum.parse("ask_status")).toThrow();
-    expect(() => ActionEnum.parse("")).toThrow();
+  test("accepts custom action names in availableActions", () => {
+    const result = PolicyDecisionSchema.parse({
+      availableActions: ["none", "nudge_hydrate"],
+      cooldownBlocked: false,
+      quietHoursBlocked: false,
+      reasons: [],
+    });
+    expect(result.availableActions).toEqual(["none", "nudge_hydrate"]);
   });
 });
 

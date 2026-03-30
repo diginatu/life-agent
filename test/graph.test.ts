@@ -1,10 +1,10 @@
 import { test, expect, describe } from "bun:test";
 import { buildGraph } from "../src/graph.ts";
-import { loadConfig } from "../src/config.ts";
 import type { FfmpegAdapter } from "../src/adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "../src/adapters/ollama.ts";
 import type { FilesystemAdapter } from "../src/adapters/filesystem.ts";
 import type { NotifierAdapter } from "../src/adapters/notifier.ts";
+import { mockActionsConfig } from "./helpers/mock-config.ts";
 
 function mockFfmpeg(success: boolean, stderr = ""): FfmpegAdapter {
   return {
@@ -87,7 +87,7 @@ function allMocks(overrides: {
 }
 
 describe("buildGraph (full pipeline)", () => {
-  const config = loadConfig();
+  const config = mockActionsConfig();
 
   test("happy path: all 6 nodes succeed, nudge with message", async () => {
     const graph = buildGraph(config, allMocks());

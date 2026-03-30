@@ -1,75 +1,246 @@
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { loadConfig, CONFIG_ENV_KEYS } from "../src/config.ts";
+import { test, expect, describe } from "bun:test";
+import { loadConfig } from "../src/config.ts";
+
+const VALID_YAML = `
+settings:
+  webcamDevice: /dev/video2
+  ollamaModel: llama3:8b
+  ollamaBaseUrl: http://localhost:11434
+  logDir: ./my-logs
+  captureDir: ./my-captures
+  captureWidth: 1280
+  captureHeight: 720
+  quietHoursStart: 22
+  quietHoursEnd: 6
+  cooldownMinutes: 15
+  confidenceThreshold: 0.5
+
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+  nudge_break:
+    active: true
+    description: "Suggest the user take a short break"
+    fallback:
+      title: "Time for a break"
+      body: "Consider standing up and stretching."
+  nudge_sleep:
+    active: true
+    description: "Suggest the user go to sleep"
+    fallback:
+      title: "Time to wind down"
+      body: "Consider wrapping up and heading to bed."
+`;
+
+const MINIMAL_YAML = `
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+`;
+
+const CUSTOM_ACTION_YAML = `
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+  nudge_hydrate:
+    active: true
+    description: "Remind the user to drink water"
+    fallback:
+      title: "Stay hydrated"
+      body: "Time to drink some water."
+  nudge_posture:
+    active: true
+    description: "Remind the user to check posture"
+    fallback:
+      title: "Check your posture"
+      body: "Sit up straight and relax your shoulders."
+`;
 
 describe("loadConfig", () => {
-  const originalEnv = { ...process.env };
+  describe("settings", () => {
+    test("parses full settings from YAML", () => {
+      const config = loadConfig(VALID_YAML);
+      expect(config.settings.webcamDevice).toBe("/dev/video2");
+      expect(config.settings.ollamaModel).toBe("llama3:8b");
+      expect(config.settings.logDir).toBe("./my-logs");
+      expect(config.settings.captureWidth).toBe(1280);
+      expect(config.settings.quietHoursStart).toBe(22);
+      expect(config.settings.cooldownMinutes).toBe(15);
+      expect(config.settings.confidenceThreshold).toBe(0.5);
+    });
 
-  beforeEach(() => {
-    // Clear all config-related env vars so defaults are tested
-    for (const key of CONFIG_ENV_KEYS) {
-      delete process.env[key];
-    }
+    test("applies defaults for missing settings", () => {
+      const config = loadConfig(MINIMAL_YAML);
+      expect(config.settings.webcamDevice).toBe("/dev/video0");
+      expect(config.settings.ollamaModel).toBe("gemma3:12b");
+      expect(config.settings.logDir).toBe("./logs");
+      expect(config.settings.captureDir).toBe("./captures");
+      expect(config.settings.captureWidth).toBe(640);
+      expect(config.settings.captureHeight).toBe(480);
+      expect(config.settings.quietHoursStart).toBe(23);
+      expect(config.settings.quietHoursEnd).toBe(7);
+      expect(config.settings.cooldownMinutes).toBe(30);
+      expect(config.settings.confidenceThreshold).toBe(0.3);
+    });
+
+    test("rejects invalid ollamaBaseUrl", () => {
+      const yaml = `
+settings:
+  ollamaBaseUrl: not-a-url
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+`;
+      expect(() => loadConfig(yaml)).toThrow();
+    });
+
+    test("rejects confidence threshold out of range", () => {
+      const yaml = `
+settings:
+  confidenceThreshold: 1.5
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+`;
+      expect(() => loadConfig(yaml)).toThrow();
+    });
+
+    test("rejects quiet hours out of range", () => {
+      const yaml = `
+settings:
+  quietHoursStart: 25
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+`;
+      expect(() => loadConfig(yaml)).toThrow();
+    });
   });
 
-  afterEach(() => {
-    // Restore original env
-    for (const key of Object.keys(process.env)) {
-      if (!(key in originalEnv)) {
-        delete process.env[key];
-      }
-    }
-    Object.assign(process.env, originalEnv);
+  describe("actions", () => {
+    test("parses actions with all fields", () => {
+      const config = loadConfig(VALID_YAML);
+      expect(Object.keys(config.actions)).toEqual([
+        "none", "log_only", "nudge_break", "nudge_sleep",
+      ]);
+      expect(config.actions.nudge_break!.active).toBe(true);
+      expect(config.actions.nudge_break!.description).toBe("Suggest the user take a short break");
+      expect(config.actions.nudge_break!.fallback).toEqual({
+        title: "Time for a break",
+        body: "Consider standing up and stretching.",
+      });
+    });
+
+    test("parses custom actions", () => {
+      const config = loadConfig(CUSTOM_ACTION_YAML);
+      expect(Object.keys(config.actions)).toContain("nudge_hydrate");
+      expect(Object.keys(config.actions)).toContain("nudge_posture");
+      expect(config.actions.nudge_hydrate!.active).toBe(true);
+      expect(config.actions.nudge_hydrate!.fallback!.title).toBe("Stay hydrated");
+    });
+
+    test("rejects config without none action", () => {
+      const yaml = `
+actions:
+  log_only:
+    active: false
+`;
+      expect(() => loadConfig(yaml)).toThrow();
+    });
+
+    test("rejects config without log_only action", () => {
+      const yaml = `
+actions:
+  none:
+    active: false
+`;
+      expect(() => loadConfig(yaml)).toThrow();
+    });
+
+    test("rejects config with no actions", () => {
+      expect(() => loadConfig(`actions: {}`)).toThrow();
+    });
+
+    test("rejects active action without fallback", () => {
+      const yaml = `
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+  nudge_break:
+    active: true
+`;
+      expect(() => loadConfig(yaml)).toThrow();
+    });
+
+    test("allows passive action without fallback", () => {
+      const config = loadConfig(MINIMAL_YAML);
+      expect(config.actions.none!.fallback).toBeUndefined();
+    });
   });
 
-  test("returns defaults when no env vars set", () => {
-    const config = loadConfig();
-    expect(config.webcamDevice).toBe("/dev/video0");
-    expect(config.ollamaModel).toBe("gemma3:12b");
-    expect(config.ollamaBaseUrl).toBe("http://localhost:11434");
-    expect(config.logDir).toBe("./logs");
-    expect(config.captureDir).toBe("./captures");
-    expect(config.captureWidth).toBe(640);
-    expect(config.captureHeight).toBe(480);
-    expect(config.quietHoursStart).toBe(23);
-    expect(config.quietHoursEnd).toBe(7);
-    expect(config.cooldownMinutes).toBe(30);
-    expect(config.confidenceThreshold).toBe(0.3);
-  });
+  describe("helpers", () => {
+    test("getActionNames returns all action names", () => {
+      const config = loadConfig(VALID_YAML);
+      expect(config.getActionNames()).toEqual(["none", "log_only", "nudge_break", "nudge_sleep"]);
+    });
 
-  test("overrides defaults with env vars", () => {
-    process.env.WEBCAM_DEVICE = "/dev/video1";
-    process.env.OLLAMA_MODEL = "llava:13b";
-    process.env.CAPTURE_WIDTH = "1280";
-    process.env.CONFIDENCE_THRESHOLD = "0.5";
+    test("getActiveActions returns only active actions", () => {
+      const config = loadConfig(VALID_YAML);
+      expect(config.getActiveActions()).toEqual(["nudge_break", "nudge_sleep"]);
+    });
 
-    const config = loadConfig();
-    expect(config.webcamDevice).toBe("/dev/video1");
-    expect(config.ollamaModel).toBe("llava:13b");
-    expect(config.captureWidth).toBe(1280);
-    expect(config.confidenceThreshold).toBe(0.5);
-  });
+    test("getPassiveActions returns only passive actions", () => {
+      const config = loadConfig(VALID_YAML);
+      expect(config.getPassiveActions()).toEqual(["none", "log_only"]);
+    });
 
-  test("coerces numeric strings to numbers", () => {
-    process.env.CAPTURE_WIDTH = "800";
-    process.env.QUIET_HOURS_START = "22";
+    test("getFallbackMessage returns fallback for active action", () => {
+      const config = loadConfig(VALID_YAML);
+      expect(config.getFallbackMessage("nudge_break")).toEqual({
+        title: "Time for a break",
+        body: "Consider standing up and stretching.",
+      });
+    });
 
-    const config = loadConfig();
-    expect(config.captureWidth).toBe(800);
-    expect(config.quietHoursStart).toBe(22);
-  });
+    test("getFallbackMessage returns undefined for passive action", () => {
+      const config = loadConfig(VALID_YAML);
+      expect(config.getFallbackMessage("none")).toBeUndefined();
+    });
 
-  test("throws on invalid OLLAMA_BASE_URL", () => {
-    process.env.OLLAMA_BASE_URL = "not-a-url";
-    expect(() => loadConfig()).toThrow();
-  });
+    test("getDescription returns description string", () => {
+      const config = loadConfig(VALID_YAML);
+      expect(config.getDescription("nudge_break")).toBe("Suggest the user take a short break");
+    });
 
-  test("throws on confidence threshold out of range", () => {
-    process.env.CONFIDENCE_THRESHOLD = "1.5";
-    expect(() => loadConfig()).toThrow();
-  });
+    test("isActiveAction checks correctly", () => {
+      const config = loadConfig(VALID_YAML);
+      expect(config.isActiveAction("nudge_break")).toBe(true);
+      expect(config.isActiveAction("log_only")).toBe(false);
+      expect(config.isActiveAction("unknown_action")).toBe(false);
+    });
 
-  test("throws on quiet hours out of range", () => {
-    process.env.QUIET_HOURS_START = "25";
-    expect(() => loadConfig()).toThrow();
+    test("works with custom actions", () => {
+      const config = loadConfig(CUSTOM_ACTION_YAML);
+      expect(config.getActiveActions()).toEqual(["nudge_hydrate", "nudge_posture"]);
+      expect(config.getPassiveActions()).toEqual(["none", "log_only"]);
+      expect(config.getFallbackMessage("nudge_hydrate")).toEqual({
+        title: "Stay hydrated",
+        body: "Time to drink some water.",
+      });
+    });
   });
 });

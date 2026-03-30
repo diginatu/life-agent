@@ -1,8 +1,13 @@
-import { loadConfig } from "./config.ts";
+import { loadConfigFromFile } from "./config.ts";
 import { buildGraph } from "./graph.ts";
 
 const isDryRun = process.argv.includes("--dry-run");
-const config = loadConfig();
+const configFlagIndex = process.argv.indexOf("--config");
+const configPath = configFlagIndex !== -1
+  ? process.argv[configFlagIndex + 1]!
+  : "./config.yml";
+
+const config = await loadConfigFromFile(configPath);
 
 let graph;
 if (isDryRun) {

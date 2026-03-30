@@ -5,11 +5,13 @@ import type { SceneSummary } from "../schemas/summary.ts";
 import type { PolicyDecision } from "../schemas/policy.ts";
 import type { ActionSelection } from "../schemas/action.ts";
 import type { DraftMessage } from "../schemas/message.ts";
+import type { Config } from "../config.ts";
 
 interface PersistNodeDeps {
   fs: FilesystemAdapter;
   notifier: NotifierAdapter;
   config: { logDir: string };
+  actionsConfig: Config;
 }
 
 interface PersistNodeState {
@@ -25,10 +27,8 @@ interface PersistNodeResult {
   errors?: string[];
 }
 
-const NUDGE_ACTIONS = new Set(["nudge_break", "nudge_sleep"]);
-
 export function createPersistNode(deps: PersistNodeDeps) {
-  const { fs, notifier, config } = deps;
+  const { fs, notifier, config, actionsConfig } = deps;
 
   return async (state: PersistNodeState): Promise<PersistNodeResult> => {
     const now = new Date();
@@ -55,8 +55,8 @@ export function createPersistNode(deps: PersistNodeDeps) {
       return { errors: [msg] };
     }
 
-    // Send desktop notification for nudge actions with a message
-    if (state.decision && NUDGE_ACTIONS.has(state.decision.action) && state.message) {
+    // Send desktop notification for active actions with a message
+    if (state.decision && actionsConfig.isActiveAction(state.decision.action) && state.message) {
       try {
         await notifier.notify(state.message.title, state.message.body);
       } catch (err) {

@@ -2,6 +2,9 @@ import { test, expect, describe } from "bun:test";
 import { createPersistNode } from "../../src/nodes/persist.ts";
 import type { FilesystemAdapter } from "../../src/adapters/filesystem.ts";
 import type { NotifierAdapter } from "../../src/adapters/notifier.ts";
+import { mockActionsConfig } from "../helpers/mock-config.ts";
+
+const actionsConfig = mockActionsConfig();
 
 function mockFs(): FilesystemAdapter & { written: unknown[] } {
   const written: unknown[] = [];
@@ -53,7 +56,7 @@ describe("persist node", () => {
   test("writes log entry to filesystem", async () => {
     const fs = mockFs();
     const notifier = mockNotifier();
-    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" } });
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig });
 
     await node(baseState);
 
@@ -68,7 +71,7 @@ describe("persist node", () => {
   test("does not notify for log_only action", async () => {
     const fs = mockFs();
     const notifier = mockNotifier();
-    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" } });
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig });
 
     await node(baseState);
 
@@ -78,7 +81,7 @@ describe("persist node", () => {
   test("does not notify for none action", async () => {
     const fs = mockFs();
     const notifier = mockNotifier();
-    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" } });
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig });
 
     await node({ ...baseState, decision: { action: "none" as const, priority: "low" as const, reason: "nothing" } });
 
@@ -88,7 +91,7 @@ describe("persist node", () => {
   test("sends notification for nudge_break with message", async () => {
     const fs = mockFs();
     const notifier = mockNotifier();
-    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" } });
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig });
 
     const state = {
       ...baseState,
@@ -105,7 +108,7 @@ describe("persist node", () => {
   test("sends notification for nudge_sleep with message", async () => {
     const fs = mockFs();
     const notifier = mockNotifier();
-    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" } });
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig });
 
     const state = {
       ...baseState,
@@ -121,7 +124,7 @@ describe("persist node", () => {
   test("includes errors in log entry", async () => {
     const fs = mockFs();
     const notifier = mockNotifier();
-    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" } });
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig });
 
     await node({ ...baseState, errors: ["some error"] });
 
@@ -135,7 +138,7 @@ describe("persist node", () => {
       readLastNLines: async () => [],
     };
     const notifier = mockNotifier();
-    const node = createPersistNode({ fs: failingFs, notifier, config: { logDir: "./logs" } });
+    const node = createPersistNode({ fs: failingFs, notifier, config: { logDir: "./logs" }, actionsConfig });
 
     const result = await node(baseState);
 
@@ -146,7 +149,7 @@ describe("persist node", () => {
   test("still writes log even when no decision", async () => {
     const fs = mockFs();
     const notifier = mockNotifier();
-    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" } });
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig });
 
     const state = { ...baseState, decision: undefined };
     await node(state);
@@ -157,7 +160,7 @@ describe("persist node", () => {
   test("prints one-line summary to stdout", async () => {
     const fs = mockFs();
     const notifier = mockNotifier();
-    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" } });
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig });
 
     const state = {
       ...baseState,
