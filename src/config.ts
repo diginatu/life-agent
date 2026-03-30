@@ -13,6 +13,7 @@ const SettingsSchema = z.object({
   quietHoursEnd: z.number().int().min(0).max(23).default(7),
   cooldownMinutes: z.number().int().positive().default(30),
   confidenceThreshold: z.number().min(0).max(1).default(0.3),
+  webPort: z.number().int().positive().default(3000),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;

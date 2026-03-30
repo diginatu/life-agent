@@ -8,8 +8,7 @@ const configPath = configFlagIndex !== -1
   : "./config.yml";
 
 const config = await loadConfigFromFile(configPath);
-const port = Number(process.env.WEB_PORT) || 3000;
 const fs = createFilesystemAdapter();
 
-const server = createServer({ fs, port, logDir: config.settings.logDir });
+const server = createServer({ fs, port: config.settings.webPort, logDir: config.settings.logDir });
 console.log(`Life Agent Dashboard running at http://${server.hostname}:${server.port}`);
