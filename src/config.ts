@@ -27,6 +27,7 @@ const ActionDefinitionSchema = z.object({
   active: z.boolean(),
   description: z.string().optional(),
   fallback: FallbackMessageSchema.optional(),
+  cooldownMinutes: z.number().int().positive().optional(),
 });
 
 const RawConfigSchema = z.object({
@@ -45,6 +46,7 @@ export interface Config {
   getFallbackMessage(action: string): { title: string; body: string } | undefined;
   getDescription(action: string): string | undefined;
   isActiveAction(action: string): boolean;
+  getCooldownMinutes(action: string): number;
 }
 
 function validate(raw: z.infer<typeof RawConfigSchema>): void {
@@ -97,6 +99,10 @@ export function loadConfig(yamlContent: string): Config {
 
     isActiveAction(action: string) {
       return raw.actions[action]?.active === true;
+    },
+
+    getCooldownMinutes(action: string) {
+      return raw.actions[action]?.cooldownMinutes ?? settings.cooldownMinutes;
     },
   };
 }

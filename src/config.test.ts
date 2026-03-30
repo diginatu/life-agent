@@ -27,3 +27,60 @@ actions:
   const config = loadConfig(yaml);
   expect(config.settings.webPort).toBe(8080);
 });
+
+test("action-specific cooldownMinutes is parsed", () => {
+  const yaml = `
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+  nudge_break:
+    active: true
+    cooldownMinutes: 15
+    fallback:
+      title: Break
+      body: Take a break
+`;
+  const config = loadConfig(yaml);
+  expect(config.actions.nudge_break.cooldownMinutes).toBe(15);
+});
+
+test("getCooldownMinutes returns action-specific value", () => {
+  const yaml = `
+settings:
+  cooldownMinutes: 30
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+  nudge_break:
+    active: true
+    cooldownMinutes: 15
+    fallback:
+      title: Break
+      body: Take a break
+`;
+  const config = loadConfig(yaml);
+  expect(config.getCooldownMinutes("nudge_break")).toBe(15);
+});
+
+test("getCooldownMinutes falls back to global when action has no specific value", () => {
+  const yaml = `
+settings:
+  cooldownMinutes: 30
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+  nudge_sleep:
+    active: true
+    fallback:
+      title: Sleep
+      body: Go to sleep
+`;
+  const config = loadConfig(yaml);
+  expect(config.getCooldownMinutes("nudge_sleep")).toBe(30);
+});

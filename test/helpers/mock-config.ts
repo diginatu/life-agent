@@ -1,25 +1,34 @@
 import { loadConfig } from "../../src/config.ts";
+import { stringify as yamlStringify } from "yaml";
 
-const DEFAULT_CONFIG_YAML = `
-actions:
-  none:
-    active: false
-  log_only:
-    active: false
-  nudge_break:
-    active: true
-    description: "Suggest the user take a short break"
-    fallback:
-      title: "Time for a break"
-      body: "You've been working for a while. Consider standing up and stretching."
-  nudge_sleep:
-    active: true
-    description: "Suggest the user go to sleep"
-    fallback:
-      title: "Time to wind down"
-      body: "It's getting late. Consider wrapping up and heading to bed."
-`;
+const DEFAULT_ACTIONS: Record<string, Record<string, unknown>> = {
+  none: { active: false },
+  log_only: { active: false },
+  nudge_break: {
+    active: true,
+    description: "Suggest the user take a short break",
+    fallback: {
+      title: "Time for a break",
+      body: "You've been working for a while. Consider standing up and stretching.",
+    },
+  },
+  nudge_sleep: {
+    active: true,
+    description: "Suggest the user go to sleep",
+    fallback: {
+      title: "Time to wind down",
+      body: "It's getting late. Consider wrapping up and heading to bed.",
+    },
+  },
+};
 
-export function mockActionsConfig() {
-  return loadConfig(DEFAULT_CONFIG_YAML);
+export function mockActionsConfig(
+  actionOverrides: Record<string, Record<string, unknown>> = {},
+) {
+  const actions = { ...DEFAULT_ACTIONS };
+  for (const [name, overrides] of Object.entries(actionOverrides)) {
+    actions[name] = { ...actions[name], ...overrides };
+  }
+  const yaml = yamlStringify({ actions });
+  return loadConfig(yaml);
 }

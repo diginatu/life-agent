@@ -78,23 +78,31 @@ export function createPolicyNode(deps: PolicyNodeDeps) {
       lastEntries = [];
     }
 
-    // Cooldown check: only for active actions
-    let cooldownBlocked = false;
+    // Per-action cooldown check
+    const cooldownBlockedActions = new Set<string>();
     if (lastEntries.length > 0) {
-      const lastEntry = lastEntries[lastEntries.length - 1] as Record<string, unknown>;
-      const lastAction = (lastEntry.decision as Record<string, unknown>)?.action as string | undefined;
-      const lastTimestamp = lastEntry.timestamp as string | undefined;
-
-      if (lastAction && actionsConfig.isActiveAction(lastAction) && lastTimestamp) {
-        const elapsed = currentTime.getTime() - new Date(lastTimestamp).getTime();
-        const elapsedMinutes = elapsed / (1000 * 60);
-        if (elapsedMinutes < config.cooldownMinutes) {
-          cooldownBlocked = true;
-          restricted = true;
-          reasons.push(`cooldown active: last action "${lastAction}" was ${Math.round(elapsedMinutes)} min ago`);
+      const activeActions = actionsConfig.getActiveActions();
+      for (const actionName of activeActions) {
+        const cooldownMin = actionsConfig.getCooldownMinutes(actionName);
+        for (let i = lastEntries.length - 1; i >= 0; i--) {
+          const entry = lastEntries[i] as Record<string, unknown>;
+          const entryAction = (entry.decision as Record<string, unknown>)?.action as string | undefined;
+          if (entryAction === actionName) {
+            const entryTimestamp = entry.timestamp as string | undefined;
+            if (entryTimestamp) {
+              const elapsed = currentTime.getTime() - new Date(entryTimestamp).getTime();
+              const elapsedMinutes = elapsed / (1000 * 60);
+              if (elapsedMinutes < cooldownMin) {
+                cooldownBlockedActions.add(actionName);
+                reasons.push(`cooldown active: last action "${actionName}" was ${Math.round(elapsedMinutes)} min ago`);
+              }
+            }
+            break;
+          }
         }
       }
     }
+    const cooldownBlocked = cooldownBlockedActions.size > 0;
 
     // Confidence threshold check
     if (state.summary.confidence < config.confidenceThreshold) {
@@ -116,9 +124,13 @@ export function createPolicyNode(deps: PolicyNodeDeps) {
       }
     }
 
+    const availableActions = restricted
+      ? passiveActions
+      : allActions.filter((a) => !cooldownBlockedActions.has(a));
+
     return {
       policy: {
-        availableActions: restricted ? passiveActions : allActions,
+        availableActions,
         cooldownBlocked,
         quietHoursBlocked,
         reasons,

@@ -91,7 +91,7 @@ describe("policy node", () => {
   });
 
   describe("cooldown", () => {
-    test("restricts when last action was recent", async () => {
+    test("blocks only the specific action that was recent", async () => {
       const recentEntry = {
         timestamp: "2026-03-29T13:50:00.000Z",
         decision: { action: "nudge_break" },
@@ -105,7 +105,8 @@ describe("policy node", () => {
 
       const result = await node(makeState());
       expect(result.policy!.cooldownBlocked).toBe(true);
-      expect(result.policy!.availableActions).toEqual(["none", "log_only"]);
+      expect(result.policy!.availableActions).not.toContain("nudge_break");
+      expect(result.policy!.availableActions).toContain("nudge_sleep");
     });
 
     test("allows all when last action was long ago", async () => {
@@ -151,6 +152,100 @@ describe("policy node", () => {
       const result = await node(makeState());
       expect(result.policy!.cooldownBlocked).toBe(false);
       expect(result.policy!.availableActions).toEqual(["none", "log_only", "nudge_break", "nudge_sleep"]);
+    });
+  });
+
+  describe("per-action cooldown", () => {
+    test("nudge_break blocked but nudge_sleep available when only nudge_break was recent", async () => {
+      const recentBreak = {
+        timestamp: "2026-03-29T13:50:00.000Z",
+        decision: { action: "nudge_break" },
+        summary: { scene: "kitchen", activityGuess: "eating" },
+      };
+      const configWithPerAction = mockActionsConfig({
+        nudge_break: { cooldownMinutes: 30 },
+      });
+      const node = createPolicyNode({
+        fs: mockFs([recentBreak]),
+        config: defaultConfig,
+        actionsConfig: configWithPerAction,
+        now: () => new Date("2026-03-29T14:00:00.000Z"),
+      });
+
+      const result = await node(makeState({ scene: "desk", activityGuess: "typing" }));
+      expect(result.policy!.availableActions).toContain("nudge_sleep");
+      expect(result.policy!.availableActions).not.toContain("nudge_break");
+      expect(result.policy!.cooldownBlocked).toBe(true);
+    });
+
+    test("both actions blocked when both within their cooldowns", async () => {
+      const entries = [
+        {
+          timestamp: "2026-03-29T13:40:00.000Z",
+          decision: { action: "nudge_sleep" },
+          summary: { scene: "bedroom", activityGuess: null },
+        },
+        {
+          timestamp: "2026-03-29T13:50:00.000Z",
+          decision: { action: "nudge_break" },
+          summary: { scene: "kitchen", activityGuess: "eating" },
+        },
+      ];
+      const configWithPerAction = mockActionsConfig({
+        nudge_break: { cooldownMinutes: 30 },
+        nudge_sleep: { cooldownMinutes: 60 },
+      });
+      const node = createPolicyNode({
+        fs: mockFs(entries),
+        config: defaultConfig,
+        actionsConfig: configWithPerAction,
+        now: () => new Date("2026-03-29T14:00:00.000Z"),
+      });
+
+      const result = await node(makeState({ scene: "desk", activityGuess: "typing" }));
+      expect(result.policy!.availableActions).not.toContain("nudge_break");
+      expect(result.policy!.availableActions).not.toContain("nudge_sleep");
+      expect(result.policy!.availableActions).toContain("none");
+      expect(result.policy!.availableActions).toContain("log_only");
+    });
+
+    test("action-specific cooldown expired allows that action", async () => {
+      const oldBreak = {
+        timestamp: "2026-03-29T13:40:00.000Z",
+        decision: { action: "nudge_break" },
+        summary: { scene: "kitchen", activityGuess: "eating" },
+      };
+      const configWithPerAction = mockActionsConfig({
+        nudge_break: { cooldownMinutes: 15 },
+      });
+      const node = createPolicyNode({
+        fs: mockFs([oldBreak]),
+        config: defaultConfig,
+        actionsConfig: configWithPerAction,
+        now: () => new Date("2026-03-29T14:00:00.000Z"),
+      });
+
+      const result = await node(makeState({ scene: "desk", activityGuess: "typing" }));
+      expect(result.policy!.availableActions).toContain("nudge_break");
+      expect(result.policy!.cooldownBlocked).toBe(false);
+    });
+
+    test("falls back to global cooldown when action has no specific setting", async () => {
+      const recentSleep = {
+        timestamp: "2026-03-29T13:50:00.000Z",
+        decision: { action: "nudge_sleep" },
+        summary: { scene: "bedroom", activityGuess: null },
+      };
+      const node = createPolicyNode({
+        fs: mockFs([recentSleep]),
+        config: { ...defaultConfig, cooldownMinutes: 30 },
+        actionsConfig,
+        now: () => new Date("2026-03-29T14:00:00.000Z"),
+      });
+
+      const result = await node(makeState({ scene: "desk", activityGuess: "typing" }));
+      expect(result.policy!.availableActions).not.toContain("nudge_sleep");
+      expect(result.policy!.cooldownBlocked).toBe(true);
     });
   });
 

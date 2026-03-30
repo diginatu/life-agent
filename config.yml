@@ -20,7 +20,7 @@ settings:
   quietHoursStart: 23
   quietHoursEnd: 7
 
-  # Minimum minutes between nudge notifications
+  # Default minimum minutes between nudge notifications (per action)
   cooldownMinutes: 30
 
   # Minimum confidence to consider acting
@@ -30,6 +30,7 @@ settings:
 # - active: true = triggers desktop notification; false = log-only
 # - description: context given to the LLM when selecting actions
 # - fallback: notification shown when LLM message drafting fails (required for active actions)
+# - cooldownMinutes: override global cooldown for this action (optional)
 actions:
   none:
     active: false
