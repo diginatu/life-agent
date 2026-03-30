@@ -2,6 +2,9 @@ import { test, expect, describe } from "bun:test";
 import { createActionNode } from "../../src/nodes/action.ts";
 import { ActionSelectionSchema } from "../../src/schemas/action.ts";
 import type { OllamaAdapter } from "../../src/adapters/ollama.ts";
+import { mockActionsConfig } from "../helpers/mock-config.ts";
+
+const actionsConfig = mockActionsConfig();
 
 const validActionJson = JSON.stringify({
   action: "nudge_break",
@@ -55,7 +58,7 @@ function makeState(overrides: Record<string, unknown> = {}) {
 
 describe("action node", () => {
   test("happy path: LLM selects valid action", async () => {
-    const node = createActionNode({ ollama: mockOllama() });
+    const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node(makeState());
 
     expect(result.decision).toBeDefined();
@@ -65,14 +68,14 @@ describe("action node", () => {
   });
 
   test("output matches ActionSelectionSchema", async () => {
-    const node = createActionNode({ ollama: mockOllama() });
+    const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node(makeState());
 
     expect(ActionSelectionSchema.safeParse(result.decision).success).toBe(true);
   });
 
   test("falls back to log_only on Ollama error", async () => {
-    const node = createActionNode({ ollama: errorOllama() });
+    const node = createActionNode({ ollama: errorOllama(), actionsConfig });
     const result = await node(makeState());
 
     expect(result.decision!.action).toBe("log_only");
@@ -81,7 +84,7 @@ describe("action node", () => {
   });
 
   test("falls back to log_only on invalid JSON from Ollama", async () => {
-    const node = createActionNode({ ollama: mockOllama("not json at all") });
+    const node = createActionNode({ ollama: mockOllama("not json at all"), actionsConfig });
     const result = await node(makeState());
 
     expect(result.decision!.action).toBe("log_only");
@@ -94,7 +97,7 @@ describe("action node", () => {
       priority: "low",
       reason: "test",
     });
-    const node = createActionNode({ ollama: mockOllama(invalidAction) });
+    const node = createActionNode({ ollama: mockOllama(invalidAction), actionsConfig });
     const result = await node(makeState());
 
     expect(result.decision!.action).toBe("log_only");
@@ -103,7 +106,7 @@ describe("action node", () => {
 
   test("constrains action to availableActions from policy", async () => {
     // LLM returns nudge_break, but policy only allows none/log_only
-    const node = createActionNode({ ollama: mockOllama() });
+    const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node(makeState({ policy: restrictedPolicy }));
 
     expect(result.decision!.action).toBe("log_only");
@@ -112,14 +115,14 @@ describe("action node", () => {
 
   test("handles markdown-wrapped JSON response", async () => {
     const wrapped = "```json\n" + validActionJson + "\n```";
-    const node = createActionNode({ ollama: mockOllama(wrapped) });
+    const node = createActionNode({ ollama: mockOllama(wrapped), actionsConfig });
     const result = await node(makeState());
 
     expect(result.decision!.action).toBe("nudge_break");
   });
 
   test("returns none-only with error when no summary", async () => {
-    const node = createActionNode({ ollama: mockOllama() });
+    const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node({ policy: fullPolicy });
 
     expect(result.decision!.action).toBe("log_only");
@@ -127,7 +130,7 @@ describe("action node", () => {
   });
 
   test("returns none-only with error when no policy", async () => {
-    const node = createActionNode({ ollama: mockOllama() });
+    const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node({ summary: baseSummary });
 
     expect(result.decision!.action).toBe("log_only");
@@ -143,11 +146,27 @@ describe("action node", () => {
       },
       generateWithImage: async () => validActionJson,
     };
-    const node = createActionNode({ ollama: capturingOllama });
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
     await node(makeState());
 
     expect(capturedPrompt).toContain("nudge_break");
     expect(capturedPrompt).toContain("nudge_sleep");
     expect(capturedPrompt).toContain("coding");
+  });
+
+  test("includes action descriptions from config in prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("Suggest the user take a short break");
+    expect(capturedPrompt).toContain("Suggest the user go to sleep");
   });
 });

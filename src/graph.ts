@@ -64,7 +64,7 @@ export function buildGraph(config: Config, deps: GraphDeps = {}) {
     actionsConfig: config,
   });
 
-  const actionNode = createActionNode({ ollama });
+  const actionNode = createActionNode({ ollama, actionsConfig: config });
   const messageNode = createMessageNode({ ollama, actionsConfig: config });
   const persistNode = createPersistNode({
     fs,

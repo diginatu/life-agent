@@ -27,11 +27,12 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-function buildPrompt(summary: SceneSummary, decision: ActionSelection): string {
+function buildPrompt(summary: SceneSummary, decision: ActionSelection, actionDescription?: string): string {
+  const descLine = actionDescription ? `\n- Action description: ${actionDescription}` : "";
   return `You are a friendly personal wellness assistant. Draft a short desktop notification for the user.
 
 Context:
-- Action: ${decision.action}
+- Action: ${decision.action}${descLine}
 - Reason: ${decision.reason}
 - Scene: ${summary.scene}
 - Activity: ${summary.activityGuess ?? "unknown"}
@@ -70,7 +71,11 @@ export function createMessageNode(deps: MessageNodeDeps) {
       };
     }
 
-    const prompt = buildPrompt(state.summary, state.decision);
+    const prompt = buildPrompt(
+      state.summary,
+      state.decision,
+      actionsConfig.getDescription(state.decision.action),
+    );
 
     let rawResponse: string;
     try {

@@ -139,4 +139,19 @@ describe("message node", () => {
     expect(capturedPrompt).toContain("coding");
     expect(capturedPrompt).toContain("nudge_break");
   });
+
+  test("includes action description from config in prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validMessageJson;
+      },
+      generateWithImage: async () => validMessageJson,
+    };
+    const node = createMessageNode({ ollama: capturingOllama, actionsConfig });
+    await node(makeState("nudge_break"));
+
+    expect(capturedPrompt).toContain("Suggest the user take a short break");
+  });
 });

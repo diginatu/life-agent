@@ -2,9 +2,11 @@ import type { OllamaAdapter } from "../adapters/ollama.ts";
 import { ActionSelectionSchema, type ActionSelection } from "../schemas/action.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { PolicyDecision } from "../schemas/policy.ts";
+import type { Config } from "../config.ts";
 
 interface ActionNodeDeps {
   ollama: OllamaAdapter;
+  actionsConfig: Config;
 }
 
 interface ActionNodeState {
@@ -31,7 +33,14 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-function buildPrompt(summary: SceneSummary, policy: PolicyDecision): string {
+function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config): string {
+  const actionDescriptions = policy.availableActions
+    .map((a) => {
+      const desc = actionsConfig.getDescription(a);
+      return desc ? `  - ${a}: ${desc}` : `  - ${a}`;
+    })
+    .join("\n");
+
   return `You are a personal wellness assistant. Based on the scene analysis and policy constraints, select the most appropriate action.
 
 Scene analysis:
@@ -41,8 +50,10 @@ Scene analysis:
 - Activity: ${summary.activityGuess ?? "unknown"}
 - Confidence: ${summary.confidence}
 
+Available actions:
+${actionDescriptions}
+
 Policy constraints:
-- Available actions: ${JSON.stringify(policy.availableActions)}
 - Reasons: ${policy.reasons.length > 0 ? policy.reasons.join("; ") : "none"}
 
 You MUST choose an action from the available actions list above. Return a JSON object with exactly these fields:
@@ -71,7 +82,7 @@ export function createActionNode(deps: ActionNodeDeps) {
       };
     }
 
-    const prompt = buildPrompt(state.summary, state.policy);
+    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig);
 
     let rawResponse: string;
     try {
