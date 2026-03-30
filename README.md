@@ -29,6 +29,13 @@ bun run src/index.ts
 # Run with mock adapters (no hardware/Ollama needed)
 bun run src/index.ts --dry-run
 
+# Daily digest (summarize today's logs with LLM)
+bun run src/index.ts --digest
+bun run src/index.ts --digest --date 2026-03-29
+
+# Web dashboard (view timeline at http://localhost:3000)
+bun run src/web/entry.ts
+
 # Run tests
 bun test
 ```
