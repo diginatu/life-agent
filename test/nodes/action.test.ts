@@ -278,7 +278,7 @@ describe("action node with history", () => {
     });
     await node(makeState());
 
-    expect(capturedPrompt).toContain("Previous digest");
+    expect(capturedPrompt).toContain("Previous digests");
     expect(capturedPrompt).toContain("Yesterday was a productive day");
   });
 
@@ -329,6 +329,68 @@ describe("action node with history", () => {
     await node(makeState());
 
     expect(capturedN).toBe(20);
+  });
+
+  test("reads digests from multiple days when digestDays is set", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const dayDigests: Record<string, unknown[]> = {
+      "2026-03-31": historyEntries,
+      "2026-03-30": [
+        { timestamp: "2026-03-30T20:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30\n\nA relaxed day." },
+      ],
+      "2026-03-29": [
+        { timestamp: "2026-03-29T20:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29\n\nBusy coding day." },
+      ],
+    };
+    const dateFs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async (_dir, date) => dayDigests[date] ?? [],
+    };
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: dateFs,
+      logDir: "./logs",
+      digestDays: 3,
+      now: () => new Date("2026-03-31T11:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("A relaxed day");
+    expect(capturedPrompt).toContain("Busy coding day");
+    expect(capturedPrompt).toContain("2026-03-30");
+    expect(capturedPrompt).toContain("2026-03-29");
+  });
+
+  test("skips digest section when digestDays is 0", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFs([digestEntry, ...historyEntries]),
+      logDir: "./logs",
+      digestDays: 0,
+      now: () => new Date("2026-03-31T11:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).not.toContain("Previous digests");
+    expect(capturedPrompt).not.toContain("Yesterday was a productive day");
+    expect(capturedPrompt).toContain("Recent history");
   });
 
   test("works without fs deps (backward compatible)", async () => {

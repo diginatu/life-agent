@@ -11,6 +11,7 @@ interface ActionNodeDeps {
   fs?: FilesystemAdapter;
   logDir?: string;
   historyCount?: number;
+  digestDays?: number;
   now?: () => Date;
 }
 
@@ -58,17 +59,30 @@ interface LogEntry {
   [key: string]: unknown;
 }
 
-function formatHistory(entries: LogEntry[]): { history: string; digest: string | null } {
+interface DigestInfo {
+  date: string;
+  content: string;
+}
+
+function formatHistory(entries: LogEntry[], digestEntries?: LogEntry[]): { history: string; digests: DigestInfo[] } {
   const regularEntries: LogEntry[] = [];
-  let latestDigest: string | null = null;
+  const digests: DigestInfo[] = [];
 
   for (const entry of entries) {
     if (entry.tags?.includes("digest")) {
-      if (entry.content) {
-        latestDigest = entry.content;
+      if (entry.content && entry.digestDate) {
+        digests.push({ date: entry.digestDate as string, content: entry.content });
       }
     } else {
       regularEntries.push(entry);
+    }
+  }
+
+  if (digestEntries) {
+    for (const entry of digestEntries) {
+      if (entry.content && entry.digestDate) {
+        digests.push({ date: entry.digestDate as string, content: entry.content });
+      }
     }
   }
 
@@ -83,11 +97,11 @@ function formatHistory(entries: LogEntry[]): { history: string; digest: string |
 
   return {
     history: historyLines.length > 0 ? historyLines.join("\n") : "",
-    digest: latestDigest,
+    digests,
   };
 }
 
-function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[]): string {
+function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestEntries?: LogEntry[]): string {
   const actionDescriptions = policy.availableActions
     .map((a) => {
       const desc = actionsConfig.getDescription(a);
@@ -95,11 +109,14 @@ function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfi
     })
     .join("\n");
 
-  const { history, digest } = logEntries ? formatHistory(logEntries) : { history: "", digest: null };
+  const { history, digests } = logEntries ? formatHistory(logEntries, digestEntries) : { history: "", digests: [] as DigestInfo[] };
 
   let historySections = "";
-  if (digest) {
-    historySections += `\nPrevious digest:\n${digest}\n`;
+  if (digests.length > 0) {
+    historySections += "\nPrevious digests:\n";
+    for (const d of digests) {
+      historySections += `\n[${d.date}]\n${d.content}\n`;
+    }
   }
   if (history) {
     historySections += `\nRecent history:\n${history}\n`;
@@ -153,6 +170,7 @@ export function createActionNode(deps: ActionNodeDeps) {
     const currentTime = now();
 
     let logEntries: LogEntry[] | undefined;
+    let digestEntries: LogEntry[] | undefined;
     if (deps.fs && deps.logDir) {
       const dateStr = currentTime.toISOString().slice(0, 10);
       try {
@@ -160,9 +178,34 @@ export function createActionNode(deps: ActionNodeDeps) {
       } catch {
         // History is best-effort; continue without it
       }
+
+      const digestDays = deps.digestDays ?? 1;
+      if (digestDays > 1) {
+        digestEntries = [];
+        for (let i = 1; i < digestDays; i++) {
+          const pastDate = new Date(currentTime);
+          pastDate.setDate(pastDate.getDate() - i);
+          const pastDateStr = pastDate.toISOString().slice(0, 10);
+          try {
+            const entries = await deps.fs.readLastNLines(deps.logDir, pastDateStr, 1000) as LogEntry[];
+            for (const entry of entries) {
+              if (entry.tags?.includes("digest") && entry.content) {
+                digestEntries.push(entry);
+              }
+            }
+          } catch {
+            // Best-effort
+          }
+        }
+      } else if (digestDays === 0) {
+        // Suppress digests from current day's entries too
+        if (logEntries) {
+          logEntries = logEntries.filter((e) => !e.tags?.includes("digest"));
+        }
+      }
     }
 
-    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig, currentTime, logEntries);
+    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig, currentTime, logEntries, digestEntries);
 
     let rawResponse: string;
     try {

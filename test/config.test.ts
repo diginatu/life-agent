@@ -16,6 +16,7 @@ settings:
   confidenceThreshold: 0.5
   actionHistoryCount: 20
   policyHistoryCount: 8
+  actionDigestDays: 3
 
 actions:
   none:
@@ -77,6 +78,7 @@ describe("loadConfig", () => {
       expect(config.settings.confidenceThreshold).toBe(0.5);
       expect(config.settings.actionHistoryCount).toBe(20);
       expect(config.settings.policyHistoryCount).toBe(8);
+      expect(config.settings.actionDigestDays).toBe(3);
     });
 
     test("applies defaults for missing settings", () => {
@@ -93,6 +95,7 @@ describe("loadConfig", () => {
       expect(config.settings.confidenceThreshold).toBe(0.3);
       expect(config.settings.actionHistoryCount).toBe(10);
       expect(config.settings.policyHistoryCount).toBe(5);
+      expect(config.settings.actionDigestDays).toBe(1);
     });
 
     test("rejects invalid ollamaBaseUrl", () => {
