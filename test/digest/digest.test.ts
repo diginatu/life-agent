@@ -1,6 +1,10 @@
 import { test, expect, describe } from "bun:test";
 import { buildStats, generateDigest } from "../../src/digest/generate.ts";
+import { runDigest, shouldRunDigest, writeDigestMarker } from "../../src/digest/cli.ts";
 import type { OllamaAdapter } from "../../src/adapters/ollama.ts";
+import type { DiscordAdapter } from "../../src/adapters/discord.ts";
+import type { FilesystemAdapter } from "../../src/adapters/filesystem.ts";
+import { mockActionsConfig } from "../helpers/mock-config.ts";
 
 const sampleEntries = [
   {
@@ -136,5 +140,134 @@ describe("generateDigest", () => {
     expect(capturedPrompt).toContain("coding");
     expect(capturedPrompt).toContain("nudge_break");
     expect(capturedPrompt).toContain("5"); // total entries
+  });
+});
+
+describe("runDigest with Discord", () => {
+  const config = mockActionsConfig();
+
+  function mockOllama(): OllamaAdapter {
+    return {
+      generate: async () => "## Daily Summary\n\nA productive day of coding.",
+      generateWithImage: async () => "",
+    };
+  }
+
+  function mockFs(): FilesystemAdapter {
+    return {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => sampleEntries,
+    };
+  }
+
+  function mockDiscord(): DiscordAdapter & { embeds: Array<{ title: string; body: string }> } {
+    const embeds: Array<{ title: string; body: string }> = [];
+    return {
+      embeds,
+      sendEmbed: async (title: string, body: string) => {
+        embeds.push({ title, body });
+        return "discord-msg-1";
+      },
+      collectReplies: async () => [],
+      destroy: async () => {},
+    };
+  }
+
+  test("sends digest to Discord when adapter is provided", async () => {
+    const discord = mockDiscord();
+    await runDigest(config, "2026-03-29", {
+      fs: mockFs(),
+      ollama: mockOllama(),
+      discord,
+    });
+
+    expect(discord.embeds.length).toBe(1);
+    expect(discord.embeds[0]!.title).toContain("2026-03-29");
+    expect(discord.embeds[0]!.body).toContain("Daily Summary");
+  });
+
+  test("works without Discord adapter", async () => {
+    await runDigest(config, "2026-03-29", {
+      fs: mockFs(),
+      ollama: mockOllama(),
+    });
+    // No error thrown
+  });
+
+  test("writes digest marker after sending", async () => {
+    const written: unknown[] = [];
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async (_dir, _date, data) => { written.push(data); },
+      readLastNLines: async () => sampleEntries,
+    };
+    await runDigest(config, "2026-03-29", { fs, ollama: mockOllama() });
+
+    const marker = written.find((e) => {
+      const entry = e as Record<string, unknown>;
+      return (entry.tags as string[])?.includes("digest");
+    }) as Record<string, unknown> | undefined;
+    expect(marker).toBeDefined();
+    expect(marker!.digestDate).toBe("2026-03-29");
+  });
+});
+
+describe("shouldRunDigest", () => {
+  const now = new Date("2026-03-31T10:00:00.000Z");
+
+  test("returns true when no digest marker in log", async () => {
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => [
+        { timestamp: "2026-03-31T09:00:00.000Z", tags: [], decision: { action: "log_only" } },
+      ],
+    };
+    expect(await shouldRunDigest(fs, "./logs", now)).toBe(true);
+  });
+
+  test("returns false when digest marker exists within 24h", async () => {
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => [
+        { timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30" },
+      ],
+    };
+    expect(await shouldRunDigest(fs, "./logs", now)).toBe(false);
+  });
+
+  test("returns true when digest marker is older than 24h", async () => {
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => [
+        { timestamp: "2026-03-30T09:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29" },
+      ],
+    };
+    expect(await shouldRunDigest(fs, "./logs", now)).toBe(true);
+  });
+
+  test("returns true when log is empty", async () => {
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => [],
+    };
+    expect(await shouldRunDigest(fs, "./logs", now)).toBe(true);
+  });
+});
+
+describe("writeDigestMarker", () => {
+  test("writes entry with digest tag and digestDate", async () => {
+    const written: unknown[] = [];
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async (_dir, _date, data) => { written.push(data); },
+      readLastNLines: async () => [],
+    };
+    const now = new Date("2026-03-31T10:00:00.000Z");
+    await writeDigestMarker(fs, "./logs", "2026-03-30", now);
+
+    expect(written.length).toBe(1);
+    const entry = written[0] as Record<string, unknown>;
+    expect((entry.tags as string[])).toContain("digest");
+    expect(entry.digestDate).toBe("2026-03-30");
+    expect(entry.timestamp).toBe("2026-03-31T10:00:00.000Z");
+    expect(entry.eventId).toBeDefined();
   });
 });

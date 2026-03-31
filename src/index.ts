@@ -16,7 +16,18 @@ if (isDigest) {
   const date = dateFlagIndex !== -1
     ? process.argv[dateFlagIndex + 1]!
     : new Date().toISOString().slice(0, 10);
-  await runDigest(config, date);
+
+  let discord;
+  if (config.settings.discordEnabled && config.settings.discordChannelId) {
+    const token = process.env.DISCORD_BOT_TOKEN;
+    if (token) {
+      const { createDiscordAdapter } = await import("./adapters/discord.ts");
+      discord = await createDiscordAdapter(token, config.settings.discordChannelId);
+    }
+  }
+
+  await runDigest(config, date, { discord });
+  await discord?.destroy();
 } else {
   let graph;
   if (isDryRun) {
@@ -29,5 +40,32 @@ if (isDigest) {
 
   const result = await graph.invoke({});
   console.log(JSON.stringify(result, null, 2));
+
+  // Auto-digest: generate and send if none sent in last 24h
+  const { shouldRunDigest, runDigest } = await import("./digest/cli.ts");
+  const { createFilesystemAdapter } = await import("./adapters/filesystem.ts");
+  const now = new Date();
+  const fs = isDryRun
+    ? (await import("./dry-run.ts")).createDryRunDeps().fs
+    : createFilesystemAdapter();
+
+  if (await shouldRunDigest(fs, config.settings.logDir, now)) {
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      .toISOString().slice(0, 10);
+    console.log(`\nAuto-digest: generating digest for ${yesterday}`);
+
+    let discord;
+    if (!isDryRun && config.settings.discordEnabled && config.settings.discordChannelId) {
+      const token = process.env.DISCORD_BOT_TOKEN;
+      if (token) {
+        const { createDiscordAdapter } = await import("./adapters/discord.ts");
+        discord = await createDiscordAdapter(token, config.settings.discordChannelId);
+      }
+    }
+
+    await runDigest(config, yesterday, { fs, discord });
+    await discord?.destroy();
+  }
+
   process.exit(result.errors?.length ? 1 : 0);
 }
