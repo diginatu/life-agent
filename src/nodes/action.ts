@@ -1,4 +1,5 @@
 import type { OllamaAdapter } from "../adapters/ollama.ts";
+import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import { ActionSelectionSchema, type ActionSelection } from "../schemas/action.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { PolicyDecision } from "../schemas/policy.ts";
@@ -7,6 +8,8 @@ import type { Config } from "../config.ts";
 interface ActionNodeDeps {
   ollama: OllamaAdapter;
   actionsConfig: Config;
+  fs?: FilesystemAdapter;
+  logDir?: string;
   now?: () => Date;
 }
 
@@ -45,13 +48,61 @@ function formatTime(date: Date): string {
   return `${dayOfWeek}, ${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
-function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config, currentTime: Date): string {
+interface LogEntry {
+  timestamp?: string;
+  summary?: { activityGuess?: string | null; posture?: string; [key: string]: unknown };
+  decision?: { action?: string; reason?: string; [key: string]: unknown };
+  tags?: string[];
+  content?: string;
+  [key: string]: unknown;
+}
+
+function formatHistory(entries: LogEntry[]): { history: string; digest: string | null } {
+  const regularEntries: LogEntry[] = [];
+  let latestDigest: string | null = null;
+
+  for (const entry of entries) {
+    if (entry.tags?.includes("digest")) {
+      if (entry.content) {
+        latestDigest = entry.content;
+      }
+    } else {
+      regularEntries.push(entry);
+    }
+  }
+
+  const historyLines = regularEntries.map((e) => {
+    const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "??:??";
+    const activity = e.summary?.activityGuess ?? "unknown";
+    const posture = e.summary?.posture ?? "unknown";
+    const action = e.decision?.action ?? "unknown";
+    const reason = e.decision?.reason ?? "";
+    return `  ${time} | ${posture}, ${activity} → ${action}${reason ? ` (${reason})` : ""}`;
+  });
+
+  return {
+    history: historyLines.length > 0 ? historyLines.join("\n") : "",
+    digest: latestDigest,
+  };
+}
+
+function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[]): string {
   const actionDescriptions = policy.availableActions
     .map((a) => {
       const desc = actionsConfig.getDescription(a);
       return desc ? `  - ${a}: ${desc}` : `  - ${a}`;
     })
     .join("\n");
+
+  const { history, digest } = logEntries ? formatHistory(logEntries) : { history: "", digest: null };
+
+  let historySections = "";
+  if (digest) {
+    historySections += `\nPrevious digest:\n${digest}\n`;
+  }
+  if (history) {
+    historySections += `\nRecent history:\n${history}\n`;
+  }
 
   return `You are a personal wellness assistant. Based on the scene analysis and policy constraints, select the most appropriate action.
 
@@ -64,7 +115,7 @@ Scene analysis:
 
 Current time:
 - ${formatTime(currentTime)}
-
+${historySections}
 Available actions:
 ${actionDescriptions}
 
@@ -98,7 +149,19 @@ export function createActionNode(deps: ActionNodeDeps) {
     }
 
     const now = deps.now ?? (() => new Date());
-    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig, now());
+    const currentTime = now();
+
+    let logEntries: LogEntry[] | undefined;
+    if (deps.fs && deps.logDir) {
+      const dateStr = currentTime.toISOString().slice(0, 10);
+      try {
+        logEntries = await deps.fs.readLastNLines(deps.logDir, dateStr, 10) as LogEntry[];
+      } catch {
+        // History is best-effort; continue without it
+      }
+    }
+
+    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig, currentTime, logEntries);
 
     let rawResponse: string;
     try {

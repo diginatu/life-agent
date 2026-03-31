@@ -31,7 +31,7 @@ export async function runDigest(config: Config, date: string, deps: DigestDeps =
     }
   }
 
-  await writeDigestMarker(fs, config.settings.logDir, date, new Date());
+  await writeDigestMarker(fs, config.settings.logDir, date, new Date(), markdown);
 }
 
 export async function shouldRunDigest(
@@ -57,7 +57,7 @@ export async function shouldRunDigest(
 }
 
 export async function writeDigestMarker(
-  fs: FilesystemAdapter, logDir: string, digestDate: string, now: Date,
+  fs: FilesystemAdapter, logDir: string, digestDate: string, now: Date, content?: string,
 ): Promise<void> {
   const dateStr = now.toISOString().slice(0, 10);
   await fs.appendJsonLine(logDir, dateStr, {
@@ -65,5 +65,6 @@ export async function writeDigestMarker(
     timestamp: now.toISOString(),
     tags: ["digest"],
     digestDate,
+    ...(content != null && { content }),
   });
 }

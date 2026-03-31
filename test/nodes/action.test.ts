@@ -2,9 +2,24 @@ import { test, expect, describe } from "bun:test";
 import { createActionNode } from "../../src/nodes/action.ts";
 import { ActionSelectionSchema } from "../../src/schemas/action.ts";
 import type { OllamaAdapter } from "../../src/adapters/ollama.ts";
+import type { FilesystemAdapter } from "../../src/adapters/filesystem.ts";
 import { mockActionsConfig } from "../helpers/mock-config.ts";
 
 const actionsConfig = mockActionsConfig();
+
+function mockFs(entries: unknown[] = []): FilesystemAdapter {
+  return {
+    appendJsonLine: async () => {},
+    readLastNLines: async () => entries,
+  };
+}
+
+function errorFs(): FilesystemAdapter {
+  return {
+    appendJsonLine: async () => {},
+    readLastNLines: async () => { throw new Error("fs read error"); },
+  };
+}
 
 const validActionJson = JSON.stringify({
   action: "nudge_break",
@@ -196,5 +211,110 @@ describe("action node", () => {
 
     expect(capturedPrompt).toContain("Suggest the user take a short break");
     expect(capturedPrompt).toContain("Suggest the user go to sleep");
+  });
+});
+
+const historyEntries = [
+  {
+    timestamp: "2026-03-31T09:00:00.000Z",
+    summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
+    decision: { action: "log_only", priority: "low", reason: "routine" },
+  },
+  {
+    timestamp: "2026-03-31T10:00:00.000Z",
+    summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.85 },
+    decision: { action: "nudge_break", priority: "medium", reason: "long session" },
+  },
+];
+
+const digestEntry = {
+  timestamp: "2026-03-31T08:00:00.000Z",
+  tags: ["digest"],
+  digestDate: "2026-03-30",
+  content: "## Daily Summary\n\nYesterday was a productive day.",
+};
+
+describe("action node with history", () => {
+  test("includes recent history in prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFs(historyEntries),
+      logDir: "./logs",
+      now: () => new Date("2026-03-31T11:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("Recent history");
+    expect(capturedPrompt).toContain("09:00");
+    expect(capturedPrompt).toContain("coding");
+    expect(capturedPrompt).toContain("nudge_break");
+    expect(capturedPrompt).toContain("long session");
+  });
+
+  test("includes digest content in prompt when available", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFs([digestEntry, ...historyEntries]),
+      logDir: "./logs",
+      now: () => new Date("2026-03-31T11:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("Previous digest");
+    expect(capturedPrompt).toContain("Yesterday was a productive day");
+  });
+
+  test("works fine with empty history", async () => {
+    const node = createActionNode({
+      ollama: mockOllama(),
+      actionsConfig,
+      fs: mockFs([]),
+      logDir: "./logs",
+    });
+    const result = await node(makeState());
+
+    expect(result.decision).toBeDefined();
+    expect(result.decision!.action).toBe("nudge_break");
+    expect(result.errors).toBeUndefined();
+  });
+
+  test("handles filesystem error gracefully", async () => {
+    const node = createActionNode({
+      ollama: mockOllama(),
+      actionsConfig,
+      fs: errorFs(),
+      logDir: "./logs",
+    });
+    const result = await node(makeState());
+
+    expect(result.decision).toBeDefined();
+    expect(result.decision!.action).toBe("nudge_break");
+    expect(result.errors).toBeUndefined();
+  });
+
+  test("works without fs deps (backward compatible)", async () => {
+    const node = createActionNode({ ollama: mockOllama(), actionsConfig });
+    const result = await node(makeState());
+
+    expect(result.decision).toBeDefined();
+    expect(result.decision!.action).toBe("nudge_break");
   });
 });

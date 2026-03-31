@@ -270,4 +270,43 @@ describe("writeDigestMarker", () => {
     expect(entry.timestamp).toBe("2026-03-31T10:00:00.000Z");
     expect(entry.eventId).toBeDefined();
   });
+
+  test("includes digest content when provided", async () => {
+    const written: unknown[] = [];
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async (_dir, _date, data) => { written.push(data); },
+      readLastNLines: async () => [],
+    };
+    const now = new Date("2026-03-31T10:00:00.000Z");
+    const content = "## Daily Summary\n\nA productive day.";
+    await writeDigestMarker(fs, "./logs", "2026-03-30", now, content);
+
+    const entry = written[0] as Record<string, unknown>;
+    expect(entry.content).toBe(content);
+  });
+});
+
+describe("runDigest persists digest content", () => {
+  const config = mockActionsConfig();
+
+  test("writes digest markdown content to log marker", async () => {
+    const digestMarkdown = "## Daily Summary\n\nA productive day of coding.";
+    const written: unknown[] = [];
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async (_dir, _date, data) => { written.push(data); },
+      readLastNLines: async () => sampleEntries,
+    };
+    const ollama: OllamaAdapter = {
+      generate: async () => digestMarkdown,
+      generateWithImage: async () => "",
+    };
+    await runDigest(config, "2026-03-29", { fs, ollama });
+
+    const marker = written.find((e) => {
+      const entry = e as Record<string, unknown>;
+      return (entry.tags as string[])?.includes("digest");
+    }) as Record<string, unknown> | undefined;
+    expect(marker).toBeDefined();
+    expect(marker!.content).toBe(digestMarkdown);
+  });
 });
