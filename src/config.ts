@@ -14,6 +14,8 @@ const SettingsSchema = z.object({
   cooldownMinutes: z.number().int().positive().default(30),
   confidenceThreshold: z.number().min(0).max(1).default(0.3),
   webPort: z.number().int().positive().default(3000),
+  discordEnabled: z.boolean().default(false),
+  discordChannelId: z.string().default(""),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;

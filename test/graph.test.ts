@@ -83,6 +83,7 @@ function allMocks(overrides: {
     fs: mockFs(overrides.fsEntries ?? []),
     notifier: mockNotifier(),
     readFileBase64: mockReadFile,
+    now: () => new Date("2026-03-29T14:00:00"),
   };
 }
 
@@ -90,7 +91,7 @@ describe("buildGraph (full pipeline)", () => {
   const config = mockActionsConfig();
 
   test("happy path: all 6 nodes succeed, nudge with message", async () => {
-    const graph = buildGraph(config, allMocks());
+    const graph = await buildGraph(config, allMocks());
     const result = await graph.invoke({});
 
     expect(result.capture).toBeDefined();
@@ -105,7 +106,7 @@ describe("buildGraph (full pipeline)", () => {
   });
 
   test("ffmpeg failure: degrades gracefully through all nodes", async () => {
-    const graph = buildGraph(config, allMocks({ ffmpegSuccess: false, ffmpegStderr: "no camera" }));
+    const graph = await buildGraph(config, allMocks({ ffmpegSuccess: false, ffmpegStderr: "no camera" }));
     const result = await graph.invoke({});
 
     expect(result.capture).toBeUndefined();
@@ -117,7 +118,7 @@ describe("buildGraph (full pipeline)", () => {
   });
 
   test("ollama failure: degrades gracefully through all nodes", async () => {
-    const graph = buildGraph(config, allMocks({ ollamaError: true }));
+    const graph = await buildGraph(config, allMocks({ ollamaError: true }));
     const result = await graph.invoke({});
 
     expect(result.capture).toBeDefined();
@@ -134,7 +135,7 @@ describe("buildGraph (full pipeline)", () => {
       decision: { action: "log_only" },
       summary: { scene: "desk with monitor", activityGuess: "coding" },
     };
-    const graph = buildGraph(config, allMocks({ fsEntries: [lastEntry] }));
+    const graph = await buildGraph(config, allMocks({ fsEntries: [lastEntry] }));
     const result = await graph.invoke({});
 
     expect(result.policy!.availableActions).toEqual(["none", "log_only"]);
@@ -149,7 +150,7 @@ describe("buildGraph (full pipeline)", () => {
       priority: "low",
       reason: "routine check",
     });
-    const graph = buildGraph(config, allMocks({ ollamaGenerateResponses: [logOnlyAction] }));
+    const graph = await buildGraph(config, allMocks({ ollamaGenerateResponses: [logOnlyAction] }));
     const result = await graph.invoke({});
 
     expect(result.decision!.action).toBe("log_only");

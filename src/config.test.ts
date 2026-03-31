@@ -66,6 +66,27 @@ actions:
   expect(config.getCooldownMinutes("nudge_break")).toBe(15);
 });
 
+test("discordEnabled defaults to false", () => {
+  const config = loadConfig(minimalYaml);
+  expect(config.settings.discordEnabled).toBe(false);
+});
+
+test("discordEnabled and discordChannelId are parsed from YAML", () => {
+  const yaml = `
+settings:
+  discordEnabled: true
+  discordChannelId: "123456789"
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+`;
+  const config = loadConfig(yaml);
+  expect(config.settings.discordEnabled).toBe(true);
+  expect(config.settings.discordChannelId).toBe("123456789");
+});
+
 test("getCooldownMinutes falls back to global when action has no specific value", () => {
   const yaml = `
 settings:

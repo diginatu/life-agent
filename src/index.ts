@@ -22,9 +22,9 @@ if (isDigest) {
   if (isDryRun) {
     const { createDryRunDeps } = await import("./dry-run.ts");
     console.log("[dry-run] Running with mock adapters\n");
-    graph = buildGraph(config, createDryRunDeps());
+    graph = await buildGraph(config, createDryRunDeps());
   } else {
-    graph = buildGraph(config);
+    graph = await buildGraph(config);
   }
 
   const result = await graph.invoke({});

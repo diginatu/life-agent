@@ -10,10 +10,12 @@ import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
 import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
 import { createFilesystemAdapter } from "./adapters/filesystem.ts";
 import { createNotifierAdapter } from "./adapters/notifier.ts";
+import { createDiscordAdapter } from "./adapters/discord.ts";
 import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "./adapters/ollama.ts";
 import type { FilesystemAdapter } from "./adapters/filesystem.ts";
 import type { NotifierAdapter } from "./adapters/notifier.ts";
+import type { DiscordAdapter } from "./adapters/discord.ts";
 import type { Config } from "./config.ts";
 
 interface GraphDeps {
@@ -21,7 +23,9 @@ interface GraphDeps {
   ollama?: OllamaAdapter;
   fs?: FilesystemAdapter;
   notifier?: NotifierAdapter;
+  discord?: DiscordAdapter;
   readFileBase64?: (path: string) => Promise<string>;
+  now?: () => Date;
 }
 
 async function readFileBase64(path: string): Promise<string> {
@@ -30,12 +34,22 @@ async function readFileBase64(path: string): Promise<string> {
   return Buffer.from(buffer).toString("base64");
 }
 
-export function buildGraph(config: Config, deps: GraphDeps = {}) {
+export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   const s = config.settings;
   const ffmpeg = deps.ffmpeg ?? createFfmpegAdapter();
   const ollama = deps.ollama ?? createOllamaAdapterFromConfig(s);
   const fs = deps.fs ?? createFilesystemAdapter();
   const notifier = deps.notifier ?? createNotifierAdapter();
+
+  let discord: DiscordAdapter | undefined = deps.discord;
+  if (!discord && s.discordEnabled && s.discordChannelId) {
+    const token = process.env.DISCORD_BOT_TOKEN;
+    if (token) {
+      discord = await createDiscordAdapter(token, s.discordChannelId);
+    } else {
+      console.error("Discord enabled but DISCORD_BOT_TOKEN not set in environment");
+    }
+  }
 
   const captureNode = createCaptureNode({
     ffmpeg,
@@ -62,15 +76,17 @@ export function buildGraph(config: Config, deps: GraphDeps = {}) {
       logDir: s.logDir,
     },
     actionsConfig: config,
+    now: deps.now,
   });
 
-  const actionNode = createActionNode({ ollama, actionsConfig: config });
+  const actionNode = createActionNode({ ollama, actionsConfig: config, now: deps.now });
   const messageNode = createMessageNode({ ollama, actionsConfig: config });
   const persistNode = createPersistNode({
     fs,
     notifier,
     config: { logDir: s.logDir },
     actionsConfig: config,
+    discord,
   });
 
   return new StateGraph(GraphState)

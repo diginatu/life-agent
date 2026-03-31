@@ -1,5 +1,6 @@
 import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { NotifierAdapter } from "../adapters/notifier.ts";
+import type { DiscordAdapter } from "../adapters/discord.ts";
 import type { CaptureResult } from "../schemas/capture.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { PolicyDecision } from "../schemas/policy.ts";
@@ -12,6 +13,7 @@ interface PersistNodeDeps {
   notifier: NotifierAdapter;
   config: { logDir: string };
   actionsConfig: Config;
+  discord?: DiscordAdapter;
 }
 
 interface PersistNodeState {
@@ -28,13 +30,43 @@ interface PersistNodeResult {
 }
 
 export function createPersistNode(deps: PersistNodeDeps) {
-  const { fs, notifier, config, actionsConfig } = deps;
+  const { fs, notifier, config, actionsConfig, discord } = deps;
 
   return async (state: PersistNodeState): Promise<PersistNodeResult> => {
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10);
 
-    const logEntry = {
+    // Collect feedback from previous Discord message if applicable
+    let feedbackFromPrevious: { text: string; userId: string; timestamp: string }[] | null = null;
+    if (discord) {
+      try {
+        const lastEntries = await fs.readLastNLines(config.logDir, dateStr, 1);
+        if (lastEntries.length > 0) {
+          const prevEntry = lastEntries[lastEntries.length - 1] as Record<string, unknown>;
+          const prevMsgId = prevEntry.discordMessageId as string | undefined;
+          if (prevMsgId) {
+            const replies = await discord.collectReplies(prevMsgId);
+            if (replies.length > 0) {
+              feedbackFromPrevious = replies;
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`persist: discord feedback error: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    // Send Discord message for active actions
+    let discordMessageId: string | null = null;
+    if (discord && state.decision && actionsConfig.isActiveAction(state.decision.action) && state.message) {
+      try {
+        discordMessageId = await discord.sendEmbed(state.message.title, state.message.body);
+      } catch (err) {
+        console.error(`persist: discord send error: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    const logEntry: Record<string, unknown> = {
       eventId: crypto.randomUUID(),
       timestamp: now.toISOString(),
       capture: state.capture ?? null,
@@ -45,6 +77,13 @@ export function createPersistNode(deps: PersistNodeDeps) {
       errors: state.errors ?? [],
       tags: [] as string[],
     };
+
+    if (discordMessageId) {
+      logEntry.discordMessageId = discordMessageId;
+    }
+    if (feedbackFromPrevious) {
+      logEntry.feedbackFromPrevious = feedbackFromPrevious;
+    }
 
     // Write to JSONL
     try {
@@ -62,7 +101,6 @@ export function createPersistNode(deps: PersistNodeDeps) {
       } catch (err) {
         const msg = `persist: notify error: ${err instanceof Error ? err.message : String(err)}`;
         console.error(msg);
-        // Don't fail the whole node for notification failure
       }
     }
 

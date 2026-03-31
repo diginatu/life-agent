@@ -2,6 +2,7 @@ import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "./adapters/ollama.ts";
 import type { FilesystemAdapter } from "./adapters/filesystem.ts";
 import type { NotifierAdapter } from "./adapters/notifier.ts";
+import type { DiscordAdapter } from "./adapters/discord.ts";
 
 const summaryJson = JSON.stringify({
   personPresent: true,
@@ -51,7 +52,16 @@ export function createDryRunDeps() {
     },
   };
 
+  const discord: DiscordAdapter = {
+    sendEmbed: async (title, body) => {
+      console.log(`[dry-run] Would send Discord embed: "${title}" — ${body}`);
+      return "dry-run-msg-id";
+    },
+    collectReplies: async () => [],
+    destroy: async () => {},
+  };
+
   const readFileBase64 = async () => "ZHJ5LXJ1bi1mYWtlLWltYWdl"; // "dry-run-fake-image" in base64
 
-  return { ffmpeg, ollama, fs, notifier, readFileBase64 };
+  return { ffmpeg, ollama, fs, notifier, discord, readFileBase64 };
 }

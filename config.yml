@@ -26,6 +26,10 @@ settings:
   # Minimum confidence to consider acting
   confidenceThreshold: 0.3
 
+  # Discord integration (optional, disabled by default)
+  discordEnabled: false
+  discordChannelId: ""
+
 # Action definitions
 # - active: true = triggers desktop notification; false = log-only
 # - description: context given to the LLM when selecting actions
