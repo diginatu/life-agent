@@ -13,6 +13,8 @@ const SettingsSchema = z.object({
   quietHoursEnd: z.number().int().min(0).max(23).default(7),
   cooldownMinutes: z.number().int().positive().default(30),
   confidenceThreshold: z.number().min(0).max(1).default(0.3),
+  actionHistoryCount: z.number().int().nonnegative().default(10),
+  policyHistoryCount: z.number().int().nonnegative().default(5),
   webPort: z.number().int().positive().default(3000),
   discordEnabled: z.boolean().default(false),
   discordChannelId: z.string().default(""),

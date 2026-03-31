@@ -9,6 +9,7 @@ interface PolicyConfig {
   cooldownMinutes: number;
   confidenceThreshold: number;
   logDir: string;
+  historyCount?: number;
 }
 
 interface PolicyNodeDeps {
@@ -73,7 +74,7 @@ export function createPolicyNode(deps: PolicyNodeDeps) {
     const dateStr = currentTime.toISOString().slice(0, 10);
     let lastEntries: unknown[];
     try {
-      lastEntries = await fs.readLastNLines(config.logDir, dateStr, 5);
+      lastEntries = await fs.readLastNLines(config.logDir, dateStr, config.historyCount ?? 5);
     } catch {
       lastEntries = [];
     }

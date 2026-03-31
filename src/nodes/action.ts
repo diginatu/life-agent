@@ -10,6 +10,7 @@ interface ActionNodeDeps {
   actionsConfig: Config;
   fs?: FilesystemAdapter;
   logDir?: string;
+  historyCount?: number;
   now?: () => Date;
 }
 
@@ -155,7 +156,7 @@ export function createActionNode(deps: ActionNodeDeps) {
     if (deps.fs && deps.logDir) {
       const dateStr = currentTime.toISOString().slice(0, 10);
       try {
-        logEntries = await deps.fs.readLastNLines(deps.logDir, dateStr, 10) as LogEntry[];
+        logEntries = await deps.fs.readLastNLines(deps.logDir, dateStr, deps.historyCount ?? 10) as LogEntry[];
       } catch {
         // History is best-effort; continue without it
       }

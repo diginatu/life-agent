@@ -14,6 +14,8 @@ settings:
   quietHoursEnd: 6
   cooldownMinutes: 15
   confidenceThreshold: 0.5
+  actionHistoryCount: 20
+  policyHistoryCount: 8
 
 actions:
   none:
@@ -73,6 +75,8 @@ describe("loadConfig", () => {
       expect(config.settings.quietHoursStart).toBe(22);
       expect(config.settings.cooldownMinutes).toBe(15);
       expect(config.settings.confidenceThreshold).toBe(0.5);
+      expect(config.settings.actionHistoryCount).toBe(20);
+      expect(config.settings.policyHistoryCount).toBe(8);
     });
 
     test("applies defaults for missing settings", () => {
@@ -87,6 +91,8 @@ describe("loadConfig", () => {
       expect(config.settings.quietHoursEnd).toBe(7);
       expect(config.settings.cooldownMinutes).toBe(30);
       expect(config.settings.confidenceThreshold).toBe(0.3);
+      expect(config.settings.actionHistoryCount).toBe(10);
+      expect(config.settings.policyHistoryCount).toBe(5);
     });
 
     test("rejects invalid ollamaBaseUrl", () => {

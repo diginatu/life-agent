@@ -74,12 +74,13 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
       cooldownMinutes: s.cooldownMinutes,
       confidenceThreshold: s.confidenceThreshold,
       logDir: s.logDir,
+      historyCount: s.policyHistoryCount,
     },
     actionsConfig: config,
     now: deps.now,
   });
 
-  const actionNode = createActionNode({ ollama, actionsConfig: config, fs, logDir: s.logDir, now: deps.now });
+  const actionNode = createActionNode({ ollama, actionsConfig: config, fs, logDir: s.logDir, historyCount: s.actionHistoryCount, now: deps.now });
   const messageNode = createMessageNode({ ollama, actionsConfig: config });
   const persistNode = createPersistNode({
     fs,

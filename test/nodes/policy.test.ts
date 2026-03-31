@@ -155,6 +155,27 @@ describe("policy node", () => {
     });
   });
 
+  describe("historyCount", () => {
+    test("reads log entries with configured historyCount", async () => {
+      let capturedN = 0;
+      const capturingFs: FilesystemAdapter = {
+        appendJsonLine: async () => {},
+        readLastNLines: async (_dir, _date, n) => {
+          capturedN = n;
+          return [];
+        },
+      };
+      const node = createPolicyNode({
+        fs: capturingFs,
+        config: { ...defaultConfig, historyCount: 8 },
+        actionsConfig,
+      });
+      await node({ summary: baseSummary });
+
+      expect(capturedN).toBe(8);
+    });
+  });
+
   describe("per-action cooldown", () => {
     test("nudge_break blocked but nudge_sleep available when only nudge_break was recent", async () => {
       const recentBreak = {

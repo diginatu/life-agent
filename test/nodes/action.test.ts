@@ -310,6 +310,27 @@ describe("action node with history", () => {
     expect(result.errors).toBeUndefined();
   });
 
+  test("reads history with configured count", async () => {
+    let capturedN = 0;
+    const capturingFs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async (_dir, _date, n) => {
+        capturedN = n;
+        return historyEntries;
+      },
+    };
+    const node = createActionNode({
+      ollama: mockOllama(),
+      actionsConfig,
+      fs: capturingFs,
+      logDir: "./logs",
+      historyCount: 20,
+    });
+    await node(makeState());
+
+    expect(capturedN).toBe(20);
+  });
+
   test("works without fs deps (backward compatible)", async () => {
     const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node(makeState());
