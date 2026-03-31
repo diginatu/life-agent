@@ -393,6 +393,36 @@ describe("action node with history", () => {
     expect(capturedPrompt).toContain("Recent history");
   });
 
+  test("includes user feedback from previous Discord message in history", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const entriesWithFeedback = [
+      {
+        ...historyEntries[0],
+        feedbackFromPrevious: [
+          { text: "Thanks, I will stretch now", userId: "u1", timestamp: "2026-03-31T09:05:00.000Z" },
+        ],
+      },
+      historyEntries[1],
+    ];
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFs(entriesWithFeedback),
+      logDir: "./logs",
+      now: () => new Date("2026-03-31T11:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("Thanks, I will stretch now");
+  });
+
   test("works without fs deps (backward compatible)", async () => {
     const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node(makeState());

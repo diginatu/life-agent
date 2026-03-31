@@ -54,6 +54,7 @@ interface LogEntry {
   timestamp?: string;
   summary?: { activityGuess?: string | null; posture?: string; [key: string]: unknown };
   decision?: { action?: string; reason?: string; [key: string]: unknown };
+  feedbackFromPrevious?: { text: string; userId: string; timestamp: string }[];
   tags?: string[];
   content?: string;
   [key: string]: unknown;
@@ -92,7 +93,12 @@ function formatHistory(entries: LogEntry[], digestEntries?: LogEntry[]): { histo
     const posture = e.summary?.posture ?? "unknown";
     const action = e.decision?.action ?? "unknown";
     const reason = e.decision?.reason ?? "";
-    return `  ${time} | ${posture}, ${activity} → ${action}${reason ? ` (${reason})` : ""}`;
+    let line = `  ${time} | ${posture}, ${activity} → ${action}${reason ? ` (${reason})` : ""}`;
+    if (e.feedbackFromPrevious && e.feedbackFromPrevious.length > 0) {
+      const replies = e.feedbackFromPrevious.map((f) => f.text).join("; ");
+      line += `\n    user reply: ${replies}`;
+    }
+    return line;
   });
 
   return {
