@@ -18,6 +18,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # captures
 captures/
 
+# long-term memory store
+memory/
+
 # local config (created by install.sh)
 config.local.yml
 

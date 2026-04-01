@@ -1,4 +1,5 @@
 import { StateGraph, START, END } from "@langchain/langgraph";
+import type { BaseStore } from "@langchain/langgraph";
 import { GraphState } from "./state.ts";
 import { createCaptureNode } from "./nodes/capture.ts";
 import { createSummarizeNode } from "./nodes/summarize.ts";
@@ -6,11 +7,13 @@ import { createPolicyNode } from "./nodes/policy.ts";
 import { createActionNode } from "./nodes/action.ts";
 import { createMessageNode } from "./nodes/message.ts";
 import { createPersistNode } from "./nodes/persist.ts";
+import { createExtractMemoriesNode } from "./nodes/extract-memories.ts";
 import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
 import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
 import { createFilesystemAdapter } from "./adapters/filesystem.ts";
 import { createNotifierAdapter } from "./adapters/notifier.ts";
 import { createDiscordAdapter } from "./adapters/discord.ts";
+import { FileStore } from "./store/file-store.ts";
 import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "./adapters/ollama.ts";
 import type { FilesystemAdapter } from "./adapters/filesystem.ts";
@@ -24,6 +27,7 @@ interface GraphDeps {
   fs?: FilesystemAdapter;
   notifier?: NotifierAdapter;
   discord?: DiscordAdapter;
+  store?: BaseStore;
   readFileBase64?: (path: string) => Promise<string>;
   now?: () => Date;
 }
@@ -89,6 +93,9 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     actionsConfig: config,
     discord,
   });
+  const extractMemoriesNode = createExtractMemoriesNode({ ollama });
+
+  const store = deps.store ?? await FileStore.create({ dir: s.memoryDir });
 
   return new StateGraph(GraphState)
     .addNode("capture_node", captureNode)
@@ -97,12 +104,14 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     .addNode("action_node", actionNode)
     .addNode("message_node", messageNode)
     .addNode("persist_node", persistNode)
+    .addNode("extract_memories_node", extractMemoriesNode)
     .addEdge(START, "capture_node")
     .addEdge("capture_node", "summarize_node")
     .addEdge("summarize_node", "policy_node")
     .addEdge("policy_node", "action_node")
     .addEdge("action_node", "message_node")
     .addEdge("message_node", "persist_node")
-    .addEdge("persist_node", END)
-    .compile();
+    .addEdge("persist_node", "extract_memories_node")
+    .addEdge("extract_memories_node", END)
+    .compile({ store });
 }

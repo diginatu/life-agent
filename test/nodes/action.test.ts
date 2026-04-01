@@ -3,6 +3,8 @@ import { createActionNode } from "../../src/nodes/action.ts";
 import { ActionSelectionSchema } from "../../src/schemas/action.ts";
 import type { OllamaAdapter } from "../../src/adapters/ollama.ts";
 import type { FilesystemAdapter } from "../../src/adapters/filesystem.ts";
+import { InMemoryStore } from "@langchain/langgraph";
+import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { mockActionsConfig } from "../helpers/mock-config.ts";
 
 const actionsConfig = mockActionsConfig();
@@ -431,5 +433,74 @@ describe("action node with history", () => {
 
     expect(result.decision).toBeDefined();
     expect(result.decision!.action).toBe("nudge_break");
+  });
+});
+
+describe("action node with memory store", () => {
+  test("includes memories in prompt when store has patterns", async () => {
+    const store = new InMemoryStore();
+    await store.put(["user", "patterns"], "sleep-late", {
+      content: "User typically sleeps around 2am",
+      category: "sleep",
+      observedCount: 10,
+    });
+    await store.put(["user", "patterns"], "bath-routine", {
+      content: "User takes bath before bed",
+      category: "routine",
+      observedCount: 5,
+    });
+
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    const config = { store } as LangGraphRunnableConfig;
+    await node(makeState(), config);
+
+    expect(capturedPrompt).toContain("Known user patterns");
+    expect(capturedPrompt).toContain("sleeps around 2am");
+    expect(capturedPrompt).toContain("bath before bed");
+    expect(capturedPrompt).toContain("observed 10 times");
+  });
+
+  test("works without store (backward compatible)", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    await node(makeState());
+
+    expect(capturedPrompt).not.toContain("Known user patterns");
+    expect(capturedPrompt).toContain("wellness assistant");
+  });
+
+  test("works with empty store", async () => {
+    const store = new InMemoryStore();
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    const config = { store } as LangGraphRunnableConfig;
+    await node(makeState(), config);
+
+    expect(capturedPrompt).not.toContain("Known user patterns");
   });
 });

@@ -35,6 +35,9 @@ settings:
   # Number of days of previous digests passed as context when generating a new digest (0 = none)
   digestContextDays: 3
 
+  # Directory for long-term memory store (learned user patterns)
+  memoryDir: ./memory
+
   # Number of recent log entries used by the policy node for cooldown/duplicate checks
   policyHistoryCount: 5
 

@@ -16,6 +16,7 @@ const SettingsSchema = z.object({
   actionHistoryCount: z.number().int().nonnegative().default(10),
   actionDigestDays: z.number().int().nonnegative().default(1),
   digestContextDays: z.number().int().nonnegative().default(3),
+  memoryDir: z.string().default("./memory"),
   policyHistoryCount: z.number().int().nonnegative().default(5),
   webPort: z.number().int().positive().default(3000),
   discordEnabled: z.boolean().default(false),

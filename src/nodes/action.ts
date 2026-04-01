@@ -4,7 +4,15 @@ import { ActionSelectionSchema, type ActionSelection } from "../schemas/action.t
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { PolicyDecision } from "../schemas/policy.ts";
 import type { Config } from "../config.ts";
+import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { collectPreviousDigests } from "../digest/cli.ts";
+
+interface MemoryInfo {
+  key: string;
+  content: string;
+  category: string;
+  observedCount: number;
+}
 
 interface ActionNodeDeps {
   ollama: OllamaAdapter;
@@ -104,7 +112,7 @@ function formatHistory(entries: LogEntry[], digestInfos?: DigestInfo[]): { histo
   };
 }
 
-function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[]): string {
+function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[], memories?: MemoryInfo[]): string {
   const actionDescriptions = policy.availableActions
     .map((a) => {
       const desc = actionsConfig.getDescription(a);
@@ -125,6 +133,12 @@ function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfi
     historySections += `\nRecent history:\n${history}\n`;
   }
 
+  let memoriesSection = "";
+  if (memories && memories.length > 0) {
+    memoriesSection = "\nKnown user patterns:\n" +
+      memories.map((m) => `- ${m.content} (${m.category}, observed ${m.observedCount} times)`).join("\n") + "\n";
+  }
+
   return `You are a personal wellness assistant. Based on the scene analysis and policy constraints, select the most appropriate action.
 
 Scene analysis:
@@ -136,7 +150,7 @@ Scene analysis:
 
 Current time:
 - ${formatTime(currentTime)}
-${historySections}
+${memoriesSection}${historySections}
 Available actions:
 ${actionDescriptions}
 
@@ -154,7 +168,7 @@ Return ONLY the JSON object, no other text.`;
 }
 
 export function createActionNode(deps: ActionNodeDeps) {
-  return async (state: ActionNodeState): Promise<ActionNodeResult> => {
+  return async (state: ActionNodeState, config?: LangGraphRunnableConfig): Promise<ActionNodeResult> => {
     if (!state.summary) {
       return {
         decision: FALLBACK_DECISION,
@@ -193,7 +207,24 @@ export function createActionNode(deps: ActionNodeDeps) {
       }
     }
 
-    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig, currentTime, logEntries, digestInfos);
+    let memories: MemoryInfo[] | undefined;
+    try {
+      if (config?.store) {
+        const items = await config.store.search(["user", "patterns"], { limit: 20 });
+        if (items.length > 0) {
+          memories = items.map((item) => ({
+            key: item.key,
+            content: item.value.content as string,
+            category: item.value.category as string,
+            observedCount: (item.value.observedCount as number) ?? 1,
+          }));
+        }
+      }
+    } catch {
+      // Memory reading is best-effort
+    }
+
+    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig, currentTime, logEntries, digestInfos, memories);
 
     let rawResponse: string;
     try {

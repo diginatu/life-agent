@@ -1,3 +1,4 @@
+import { InMemoryStore } from "@langchain/langgraph";
 import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "./adapters/ollama.ts";
 import type { FilesystemAdapter } from "./adapters/filesystem.ts";
@@ -25,7 +26,8 @@ const messageJson = JSON.stringify({
 
 export function createDryRunDeps() {
   let generateCallIndex = 0;
-  const generateResponses = [actionJson, messageJson];
+  const extractMemoriesJson = "[]"; // no patterns extracted in dry-run
+  const generateResponses = [actionJson, messageJson, extractMemoriesJson];
 
   const ffmpeg: FfmpegAdapter = {
     captureFrame: async (_device, outputPath) => {
@@ -63,5 +65,7 @@ export function createDryRunDeps() {
 
   const readFileBase64 = async () => "ZHJ5LXJ1bi1mYWtlLWltYWdl"; // "dry-run-fake-image" in base64
 
-  return { ffmpeg, ollama, fs, notifier, discord, readFileBase64 };
+  const store = new InMemoryStore();
+
+  return { ffmpeg, ollama, fs, notifier, discord, readFileBase64, store };
 }
