@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, spyOn, afterEach } from "bun:test";
 import { createOllamaAdapter, type LlmInvoker } from "../../src/adapters/ollama.ts";
 
 function mockInvoker(responseContent: string): LlmInvoker {
@@ -61,6 +61,43 @@ describe("OllamaAdapter", () => {
       await expect(
         adapter.generateWithImage("test", "img")
       ).rejects.toThrow("timeout");
+    });
+  });
+
+  describe("debug logging", () => {
+    let logSpy: ReturnType<typeof spyOn>;
+
+    afterEach(() => {
+      logSpy?.mockRestore();
+    });
+
+    test("logs prompt and response for generate", async () => {
+      logSpy = spyOn(console, "log").mockImplementation(() => {});
+      const adapter = createOllamaAdapter(mockInvoker("response text"));
+      await adapter.generate("my prompt");
+
+      const logs = logSpy.mock.calls.map((c) => c.join(" "));
+      expect(logs.some((l) => l.includes("[LLM prompt]") && l.includes("my prompt"))).toBe(true);
+      expect(logs.some((l) => l.includes("[LLM response]") && l.includes("response text"))).toBe(true);
+    });
+
+    test("logs prompt and response for generateWithImage", async () => {
+      logSpy = spyOn(console, "log").mockImplementation(() => {});
+      const adapter = createOllamaAdapter(mockInvoker("image response"));
+      await adapter.generateWithImage("describe image", "base64data");
+
+      const logs = logSpy.mock.calls.map((c) => c.join(" "));
+      expect(logs.some((l) => l.includes("[LLM prompt]") && l.includes("describe image"))).toBe(true);
+      expect(logs.some((l) => l.includes("[LLM response]") && l.includes("image response"))).toBe(true);
+    });
+
+    test("does not log image data", async () => {
+      logSpy = spyOn(console, "log").mockImplementation(() => {});
+      const adapter = createOllamaAdapter(mockInvoker("ok"));
+      await adapter.generateWithImage("describe", "secretbase64data");
+
+      const logs = logSpy.mock.calls.map((c) => c.join(" "));
+      expect(logs.some((l) => l.includes("secretbase64data"))).toBe(false);
     });
   });
 });

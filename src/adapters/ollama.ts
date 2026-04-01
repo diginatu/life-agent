@@ -24,12 +24,16 @@ export function createOllamaAdapterFromConfig(config: {
 export function createOllamaAdapter(invoker: LlmInvoker): OllamaAdapter {
   return {
     async generate(prompt) {
+      console.log(`[LLM prompt]\n${prompt}`);
       const message = new HumanMessage({ content: prompt });
       const response = await invoker.invoke([message]);
-      return String(response.content);
+      const result = String(response.content);
+      console.log(`[LLM response]\n${result}`);
+      return result;
     },
 
     async generateWithImage(prompt, imageBase64) {
+      console.log(`[LLM prompt] (with image)\n${prompt}`);
       const message = new HumanMessage({
         content: [
           { type: "text", text: prompt },
@@ -40,7 +44,9 @@ export function createOllamaAdapter(invoker: LlmInvoker): OllamaAdapter {
         ],
       });
       const response = await invoker.invoke([message]);
-      return String(response.content);
+      const result = String(response.content);
+      console.log(`[LLM response]\n${result}`);
+      return result;
     },
   };
 }
