@@ -311,11 +311,13 @@ describe("action node with history", () => {
   });
 
   test("reads history with configured count", async () => {
-    let capturedN = 0;
+    let firstN = 0;
+    let callCount = 0;
     const capturingFs: FilesystemAdapter = {
       appendJsonLine: async () => {},
       readLastNLines: async (_dir, _date, n) => {
-        capturedN = n;
+        callCount++;
+        if (callCount === 1) firstN = n;
         return historyEntries;
       },
     };
@@ -328,7 +330,7 @@ describe("action node with history", () => {
     });
     await node(makeState());
 
-    expect(capturedN).toBe(20);
+    expect(firstN).toBe(20);
   });
 
   test("reads digests from multiple days when digestDays is set", async () => {

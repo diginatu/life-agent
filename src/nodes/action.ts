@@ -4,6 +4,7 @@ import { ActionSelectionSchema, type ActionSelection } from "../schemas/action.t
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { PolicyDecision } from "../schemas/policy.ts";
 import type { Config } from "../config.ts";
+import { collectPreviousDigests } from "../digest/cli.ts";
 
 interface ActionNodeDeps {
   ollama: OllamaAdapter;
@@ -65,7 +66,7 @@ interface DigestInfo {
   content: string;
 }
 
-function formatHistory(entries: LogEntry[], digestEntries?: LogEntry[]): { history: string; digests: DigestInfo[] } {
+function formatHistory(entries: LogEntry[], digestInfos?: DigestInfo[]): { history: string; digests: DigestInfo[] } {
   const regularEntries: LogEntry[] = [];
   const digests: DigestInfo[] = [];
 
@@ -79,12 +80,8 @@ function formatHistory(entries: LogEntry[], digestEntries?: LogEntry[]): { histo
     }
   }
 
-  if (digestEntries) {
-    for (const entry of digestEntries) {
-      if (entry.content && entry.digestDate) {
-        digests.push({ date: entry.digestDate as string, content: entry.content });
-      }
-    }
+  if (digestInfos) {
+    digests.push(...digestInfos);
   }
 
   const historyLines = regularEntries.map((e) => {
@@ -107,7 +104,7 @@ function formatHistory(entries: LogEntry[], digestEntries?: LogEntry[]): { histo
   };
 }
 
-function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestEntries?: LogEntry[]): string {
+function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[]): string {
   const actionDescriptions = policy.availableActions
     .map((a) => {
       const desc = actionsConfig.getDescription(a);
@@ -115,7 +112,7 @@ function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfi
     })
     .join("\n");
 
-  const { history, digests } = logEntries ? formatHistory(logEntries, digestEntries) : { history: "", digests: [] as DigestInfo[] };
+  const { history, digests } = logEntries ? formatHistory(logEntries, digestInfos) : { history: "", digests: [] as DigestInfo[] };
 
   let historySections = "";
   if (digests.length > 0) {
@@ -176,7 +173,7 @@ export function createActionNode(deps: ActionNodeDeps) {
     const currentTime = now();
 
     let logEntries: LogEntry[] | undefined;
-    let digestEntries: LogEntry[] | undefined;
+    let digestInfos: DigestInfo[] | undefined;
     if (deps.fs && deps.logDir) {
       const dateStr = currentTime.toISOString().slice(0, 10);
       try {
@@ -186,24 +183,9 @@ export function createActionNode(deps: ActionNodeDeps) {
       }
 
       const digestDays = deps.digestDays ?? 1;
-      if (digestDays > 1) {
-        digestEntries = [];
-        for (let i = 1; i < digestDays; i++) {
-          const pastDate = new Date(currentTime);
-          pastDate.setDate(pastDate.getDate() - i);
-          const pastDateStr = pastDate.toISOString().slice(0, 10);
-          try {
-            const entries = await deps.fs.readLastNLines(deps.logDir, pastDateStr, 1000) as LogEntry[];
-            for (const entry of entries) {
-              if (entry.tags?.includes("digest") && entry.content) {
-                digestEntries.push(entry);
-              }
-            }
-          } catch {
-            // Best-effort
-          }
-        }
-      } else if (digestDays === 0) {
+      if (digestDays > 0) {
+        digestInfos = await collectPreviousDigests(deps.fs, deps.logDir, dateStr, digestDays);
+      } else {
         // Suppress digests from current day's entries too
         if (logEntries) {
           logEntries = logEntries.filter((e) => !e.tags?.includes("digest"));
@@ -211,7 +193,7 @@ export function createActionNode(deps: ActionNodeDeps) {
       }
     }
 
-    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig, currentTime, logEntries, digestEntries);
+    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig, currentTime, logEntries, digestInfos);
 
     let rawResponse: string;
     try {

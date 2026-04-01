@@ -1,6 +1,6 @@
 import { test, expect, describe } from "bun:test";
 import { buildStats, generateDigest } from "../../src/digest/generate.ts";
-import { runDigest, shouldRunDigest, writeDigestMarker } from "../../src/digest/cli.ts";
+import { runDigest, shouldRunDigest, writeDigestMarker, collectPreviousDigests } from "../../src/digest/cli.ts";
 import type { OllamaAdapter } from "../../src/adapters/ollama.ts";
 import type { DiscordAdapter } from "../../src/adapters/discord.ts";
 import type { FilesystemAdapter } from "../../src/adapters/filesystem.ts";
@@ -308,5 +308,189 @@ describe("runDigest persists digest content", () => {
     }) as Record<string, unknown> | undefined;
     expect(marker).toBeDefined();
     expect(marker!.content).toBe(digestMarkdown);
+  });
+});
+
+describe("collectPreviousDigests", () => {
+  test("returns empty array when no digest entries exist", async () => {
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => sampleEntries,
+    };
+    const result = await collectPreviousDigests(fs, "./logs", "2026-03-31", 3);
+    expect(result).toEqual([]);
+  });
+
+  test("finds digests from previous days' log files", async () => {
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async (_dir, date) => {
+        if (date === "2026-03-31") {
+          return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }];
+        }
+        if (date === "2026-03-30") {
+          return [{ timestamp: "2026-03-30T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29 digest" }];
+        }
+        return [];
+      },
+    };
+    const result = await collectPreviousDigests(fs, "./logs", "2026-03-31", 3);
+    expect(result.length).toBe(2);
+    expect(result[0]!.date).toBe("2026-03-29");
+    expect(result[1]!.date).toBe("2026-03-30");
+  });
+
+  test("excludes digests for the target date itself", async () => {
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async (_dir, date) => {
+        if (date === "2026-03-31") {
+          return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-31", content: "## March 31 digest" }];
+        }
+        return [];
+      },
+    };
+    const result = await collectPreviousDigests(fs, "./logs", "2026-03-31", 3);
+    expect(result).toEqual([]);
+  });
+
+  test("deduplicates by digestDate", async () => {
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async (_dir, date) => {
+        if (date === "2026-03-31") {
+          return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29 digest (copy 1)" }];
+        }
+        if (date === "2026-03-30") {
+          return [{ timestamp: "2026-03-30T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29 digest (copy 2)" }];
+        }
+        return [];
+      },
+    };
+    const result = await collectPreviousDigests(fs, "./logs", "2026-03-31", 3);
+    expect(result.length).toBe(1);
+    expect(result[0]!.date).toBe("2026-03-29");
+  });
+
+  test("respects days parameter", async () => {
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async (_dir, date) => {
+        const digestsByDate: Record<string, unknown[]> = {
+          "2026-03-31": [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }],
+          "2026-03-30": [{ timestamp: "2026-03-30T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29 digest" }],
+          "2026-03-29": [{ timestamp: "2026-03-29T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-28", content: "## March 28 digest" }],
+          "2026-03-28": [{ timestamp: "2026-03-28T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-27", content: "## March 27 digest" }],
+          "2026-03-27": [{ timestamp: "2026-03-27T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-26", content: "## March 26 digest" }],
+        };
+        return digestsByDate[date] ?? [];
+      },
+    };
+    const result = await collectPreviousDigests(fs, "./logs", "2026-03-31", 2);
+    // Only the 2-day window before 2026-03-31 should be included (2026-03-30 and 2026-03-29)
+    expect(result.length).toBeLessThanOrEqual(2);
+    const dates = result.map((r) => r.date);
+    expect(dates.every((d) => d >= "2026-03-29")).toBe(true);
+  });
+
+  test("handles read errors gracefully", async () => {
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async (_dir, date) => {
+        if (date === "2026-03-31") {
+          return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }];
+        }
+        if (date === "2026-03-30") {
+          throw new Error("read error");
+        }
+        return [];
+      },
+    };
+    const result = await collectPreviousDigests(fs, "./logs", "2026-03-31", 3);
+    expect(result.length).toBe(1);
+    expect(result[0]!.date).toBe("2026-03-30");
+  });
+});
+
+describe("generateDigest with previous digests", () => {
+  test("includes previous digests in LLM prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return "## Summary";
+      },
+      generateWithImage: async () => "",
+    };
+    const previousDigests = [{ date: "2026-03-30", content: "## Yesterday summary" }];
+    await generateDigest(sampleEntries, "2026-03-31", capturingOllama, previousDigests);
+
+    expect(capturedPrompt).toContain("Yesterday summary");
+    expect(capturedPrompt).toContain("2026-03-30");
+  });
+
+  test("instructs LLM to focus on new observations", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return "## Summary";
+      },
+      generateWithImage: async () => "",
+    };
+    const previousDigests = [{ date: "2026-03-30", content: "## Yesterday summary" }];
+    await generateDigest(sampleEntries, "2026-03-31", capturingOllama, previousDigests);
+
+    const hasNewOrDifferent = capturedPrompt.toLowerCase().includes("new") || capturedPrompt.toLowerCase().includes("different");
+    expect(hasNewOrDifferent).toBe(true);
+  });
+
+  test("works without previous digests (backward compatible)", async () => {
+    const mockOllama: OllamaAdapter = {
+      generate: async () => "## Summary",
+      generateWithImage: async () => "",
+    };
+    const result = await generateDigest(sampleEntries, "2026-03-31", mockOllama);
+    expect(result).toContain("Summary");
+  });
+});
+
+describe("runDigest collects previous digests", () => {
+  const config = mockActionsConfig();
+
+  test("passes previous digests to generateDigest", async () => {
+    const datesRead: string[] = [];
+    let capturedPrompt = "";
+
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async (_dir, date) => {
+        datesRead.push(date as string);
+        if (date === "2026-03-29") {
+          return sampleEntries;
+        }
+        if (date === "2026-03-28") {
+          return [{ timestamp: "2026-03-28T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-27", content: "## March 27 digest" }];
+        }
+        return [];
+      },
+    };
+
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return "## Summary";
+      },
+      generateWithImage: async () => "",
+    };
+
+    await runDigest(config, "2026-03-29", { fs, ollama: capturingOllama });
+
+    // readLastNLines should have been called for dates before the target date
+    const datesBeforeTarget = datesRead.filter((d) => d < "2026-03-29");
+    expect(datesBeforeTarget.length).toBeGreaterThan(0);
+
+    // The captured prompt should include content from previous digest
+    expect(capturedPrompt).toContain("March 27 digest");
   });
 });

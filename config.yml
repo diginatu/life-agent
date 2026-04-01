@@ -32,6 +32,9 @@ settings:
   # Number of days of digest summaries passed to the action LLM (0 = none)
   actionDigestDays: 1
 
+  # Number of days of previous digests passed as context when generating a new digest (0 = none)
+  digestContextDays: 3
+
   # Number of recent log entries used by the policy node for cooldown/duplicate checks
   policyHistoryCount: 5
 

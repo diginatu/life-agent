@@ -99,7 +99,7 @@ function formatStatsMarkdown(date: string, stats: DayStats): string {
   return lines.join("\n");
 }
 
-function buildDigestPrompt(date: string, stats: DayStats, entries: LogEntry[]): string {
+function buildDigestPrompt(date: string, stats: DayStats, entries: LogEntry[], previousDigests?: Array<{ date: string; content: string }>): string {
   const statsSummary = formatStatsMarkdown(date, stats);
   const sampleSize = Math.min(entries.length, 20);
   const sampled = entries.slice(0, sampleSize).map((e) => ({
@@ -110,7 +110,19 @@ function buildDigestPrompt(date: string, stats: DayStats, entries: LogEntry[]): 
     reason: e.decision?.action !== "log_only" ? (e.decision as Record<string, unknown>)?.reason : undefined,
   }));
 
+  let previousDigestSection = "";
+  if (previousDigests && previousDigests.length > 0) {
+    previousDigestSection = "\n## Recent Digests (for context — do NOT repeat these observations)\n";
+    for (const d of previousDigests) {
+      previousDigestSection += `\n[${d.date}]\n${d.content}\n`;
+    }
+  }
+
+  const hasPreviousContext = previousDigests && previousDigests.length > 0;
+
   return `You are a personal wellness analyst. Write a concise daily digest in markdown based on the data below.
+${previousDigestSection}
+## Today's Data — ${date}
 
 ${statsSummary}
 
@@ -118,10 +130,18 @@ ${statsSummary}
 
 ${JSON.stringify(sampled, null, 2)}
 
-Write a friendly 3-5 paragraph summary covering:
+${hasPreviousContext
+    ? `Write a brief 1-3 paragraph summary. Focus ONLY on:
+1. What is new or different today compared to recent days
+2. Notable changes in patterns, activities, or wellness
+3. Any concerning trends or positive improvements
+
+If today was similar to recent days, keep it very short (1 paragraph).
+Do NOT repeat patterns already described in recent digests.`
+    : `Write a friendly 3-5 paragraph summary covering:
 1. Overall patterns (how the day went)
 2. Activity breakdown and any notable transitions
-3. Wellness observations (breaks taken, posture, etc.)
+3. Wellness observations (breaks taken, posture, etc.)`}
 
 Use markdown formatting. Start with a ## heading. Be concise.`;
 }
@@ -130,6 +150,7 @@ export async function generateDigest(
   entries: LogEntry[],
   date: string,
   ollama: OllamaAdapter,
+  previousDigests?: Array<{ date: string; content: string }>,
 ): Promise<string> {
   if (entries.length === 0) {
     try {
@@ -142,7 +163,7 @@ export async function generateDigest(
   }
 
   const stats = buildStats(entries);
-  const prompt = buildDigestPrompt(date, stats, entries);
+  const prompt = buildDigestPrompt(date, stats, entries, previousDigests);
 
   try {
     return await ollama.generate(prompt);
