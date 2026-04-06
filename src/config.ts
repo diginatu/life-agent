@@ -9,15 +9,10 @@ const SettingsSchema = z.object({
   captureDir: z.string().default("./captures"),
   captureWidth: z.number().int().positive().default(640),
   captureHeight: z.number().int().positive().default(480),
-  quietHoursStart: z.number().int().min(0).max(23).default(23),
-  quietHoursEnd: z.number().int().min(0).max(23).default(7),
-  cooldownMinutes: z.number().int().positive().default(30),
-  confidenceThreshold: z.number().min(0).max(1).default(0.3),
   actionHistoryCount: z.number().int().nonnegative().default(10),
   actionDigestDays: z.number().int().nonnegative().default(1),
   digestContextDays: z.number().int().nonnegative().default(3),
   memoryDir: z.string().default("./memory"),
-  policyHistoryCount: z.number().int().nonnegative().default(5),
   webPort: z.number().int().positive().default(3000),
   discordEnabled: z.boolean().default(false),
   discordChannelId: z.string().default(""),
@@ -34,7 +29,6 @@ const ActionDefinitionSchema = z.object({
   active: z.boolean(),
   description: z.string().optional(),
   fallback: FallbackMessageSchema.optional(),
-  cooldownMinutes: z.number().int().positive().optional(),
 });
 
 const RawConfigSchema = z.object({
@@ -53,7 +47,6 @@ export interface Config {
   getFallbackMessage(action: string): { title: string; body: string } | undefined;
   getDescription(action: string): string | undefined;
   isActiveAction(action: string): boolean;
-  getCooldownMinutes(action: string): number;
 }
 
 function validate(raw: z.infer<typeof RawConfigSchema>): void {
@@ -108,9 +101,6 @@ export function loadConfig(yamlContent: string): Config {
       return raw.actions[action]?.active === true;
     },
 
-    getCooldownMinutes(action: string) {
-      return raw.actions[action]?.cooldownMinutes ?? settings.cooldownMinutes;
-    },
   };
 }
 

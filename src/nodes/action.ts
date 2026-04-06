@@ -2,7 +2,6 @@ import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import { ActionSelectionSchema, type ActionSelection } from "../schemas/action.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
-import type { PolicyDecision } from "../schemas/policy.ts";
 import type { Config } from "../config.ts";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { collectPreviousDigests } from "../digest/cli.ts";
@@ -26,7 +25,6 @@ interface ActionNodeDeps {
 
 interface ActionNodeState {
   summary?: SceneSummary;
-  policy?: PolicyDecision;
 }
 
 interface ActionNodeResult {
@@ -112,8 +110,9 @@ function formatHistory(entries: LogEntry[], digestInfos?: DigestInfo[]): { histo
   };
 }
 
-function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[], memories?: MemoryInfo[]): string {
-  const actionDescriptions = policy.availableActions
+function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[], memories?: MemoryInfo[]): string {
+  const allActions = actionsConfig.getActionNames();
+  const actionDescriptions = allActions
     .map((a) => {
       const desc = actionsConfig.getDescription(a);
       return desc ? `  - ${a}: ${desc}` : `  - ${a}`;
@@ -139,7 +138,7 @@ function buildPrompt(summary: SceneSummary, policy: PolicyDecision, actionsConfi
       memories.map((m) => `- ${m.content} (${m.category}, observed ${m.observedCount} times)`).join("\n") + "\n";
   }
 
-  return `You are a personal wellness assistant. Based on the scene analysis and policy constraints, select the most appropriate action.
+  return `You are a personal wellness assistant. Based on the scene analysis, user patterns, and history, select the most appropriate action.
 
 Scene analysis:
 - Person present: ${summary.personPresent}
@@ -154,12 +153,9 @@ ${memoriesSection}${historySections}
 Available actions:
 ${actionDescriptions}
 
-Policy constraints:
-- Reasons: ${policy.reasons.length > 0 ? policy.reasons.join("; ") : "none"}
-
 You MUST choose an action from the available actions list above. Return a JSON object with exactly these fields:
 {
-  "action": one of ${JSON.stringify(policy.availableActions)},
+  "action": one of ${JSON.stringify(allActions)},
   "priority": "low" | "medium" | "high",
   "reason": string explaining your choice
 }
@@ -173,13 +169,6 @@ export function createActionNode(deps: ActionNodeDeps) {
       return {
         decision: FALLBACK_DECISION,
         errors: ["action: no summary data in state"],
-      };
-    }
-
-    if (!state.policy) {
-      return {
-        decision: FALLBACK_DECISION,
-        errors: ["action: no policy data in state"],
       };
     }
 
@@ -224,7 +213,7 @@ export function createActionNode(deps: ActionNodeDeps) {
       // Memory reading is best-effort
     }
 
-    const prompt = buildPrompt(state.summary, state.policy, deps.actionsConfig, currentTime, logEntries, digestInfos, memories);
+    const prompt = buildPrompt(state.summary, deps.actionsConfig, currentTime, logEntries, digestInfos, memories);
 
     let rawResponse: string;
     try {
@@ -249,13 +238,6 @@ export function createActionNode(deps: ActionNodeDeps) {
     const result = ActionSelectionSchema.safeParse(parsed);
     if (!result.success) {
       const msg = `action: schema validation failed: ${JSON.stringify(result.error.issues)}`;
-      console.error(msg);
-      return { decision: FALLBACK_DECISION, errors: [msg] };
-    }
-
-    // Enforce policy constraint: selected action must be in availableActions
-    if (!state.policy.availableActions.includes(result.data.action)) {
-      const msg = `action: LLM selected "${result.data.action}" not in available actions ${JSON.stringify(state.policy.availableActions)}, falling back`;
       console.error(msg);
       return { decision: FALLBACK_DECISION, errors: [msg] };
     }

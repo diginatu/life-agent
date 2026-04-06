@@ -96,8 +96,6 @@ describe("buildGraph (full pipeline)", () => {
 
     expect(result.capture).toBeDefined();
     expect(result.summary).toBeDefined();
-    expect(result.policy).toBeDefined();
-    expect(result.policy!.availableActions).toContain("nudge_break");
     expect(result.decision).toBeDefined();
     expect(result.decision!.action).toBe("nudge_break");
     expect(result.message).toBeDefined();
@@ -111,7 +109,6 @@ describe("buildGraph (full pipeline)", () => {
 
     expect(result.capture).toBeUndefined();
     expect(result.summary).toBeUndefined();
-    expect(result.policy!.availableActions).toEqual(["none"]);
     expect(result.decision!.action).toBe("log_only");
     expect(result.message).toBeNull();
     expect(result.errors.length).toBeGreaterThan(0);
@@ -123,25 +120,9 @@ describe("buildGraph (full pipeline)", () => {
 
     expect(result.capture).toBeDefined();
     expect(result.summary).toBeUndefined();
-    expect(result.policy!.availableActions).toEqual(["none"]);
     expect(result.decision!.action).toBe("log_only");
     expect(result.message).toBeNull();
     expect(result.errors.some((e: string) => e.includes("ollama"))).toBe(true);
-  });
-
-  test("policy restricts on duplicate scene, no nudge message", async () => {
-    const lastEntry = {
-      timestamp: new Date().toISOString(),
-      decision: { action: "log_only" },
-      summary: { scene: "desk with monitor", activityGuess: "coding" },
-    };
-    const graph = await buildGraph(config, allMocks({ fsEntries: [lastEntry] }));
-    const result = await graph.invoke({});
-
-    expect(result.policy!.availableActions).toEqual(["none", "log_only"]);
-    expect(result.policy!.reasons.some((r: string) => r.includes("duplicate"))).toBe(true);
-    expect(["none", "log_only"]).toContain(result.decision!.action);
-    expect(result.message).toBeNull();
   });
 
   test("log_only action: no message drafted, no notification", async () => {

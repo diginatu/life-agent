@@ -10,12 +10,7 @@ settings:
   captureDir: ./my-captures
   captureWidth: 1280
   captureHeight: 720
-  quietHoursStart: 22
-  quietHoursEnd: 6
-  cooldownMinutes: 15
-  confidenceThreshold: 0.5
   actionHistoryCount: 20
-  policyHistoryCount: 8
   actionDigestDays: 3
 
 actions:
@@ -73,11 +68,7 @@ describe("loadConfig", () => {
       expect(config.settings.ollamaModel).toBe("llama3:8b");
       expect(config.settings.logDir).toBe("./my-logs");
       expect(config.settings.captureWidth).toBe(1280);
-      expect(config.settings.quietHoursStart).toBe(22);
-      expect(config.settings.cooldownMinutes).toBe(15);
-      expect(config.settings.confidenceThreshold).toBe(0.5);
       expect(config.settings.actionHistoryCount).toBe(20);
-      expect(config.settings.policyHistoryCount).toBe(8);
       expect(config.settings.actionDigestDays).toBe(3);
     });
 
@@ -89,12 +80,7 @@ describe("loadConfig", () => {
       expect(config.settings.captureDir).toBe("./captures");
       expect(config.settings.captureWidth).toBe(640);
       expect(config.settings.captureHeight).toBe(480);
-      expect(config.settings.quietHoursStart).toBe(23);
-      expect(config.settings.quietHoursEnd).toBe(7);
-      expect(config.settings.cooldownMinutes).toBe(30);
-      expect(config.settings.confidenceThreshold).toBe(0.3);
       expect(config.settings.actionHistoryCount).toBe(10);
-      expect(config.settings.policyHistoryCount).toBe(5);
       expect(config.settings.actionDigestDays).toBe(1);
     });
 
@@ -111,31 +97,6 @@ actions:
       expect(() => loadConfig(yaml)).toThrow();
     });
 
-    test("rejects confidence threshold out of range", () => {
-      const yaml = `
-settings:
-  confidenceThreshold: 1.5
-actions:
-  none:
-    active: false
-  log_only:
-    active: false
-`;
-      expect(() => loadConfig(yaml)).toThrow();
-    });
-
-    test("rejects quiet hours out of range", () => {
-      const yaml = `
-settings:
-  quietHoursStart: 25
-actions:
-  none:
-    active: false
-  log_only:
-    active: false
-`;
-      expect(() => loadConfig(yaml)).toThrow();
-    });
   });
 
   describe("actions", () => {

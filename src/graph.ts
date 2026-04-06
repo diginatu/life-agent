@@ -3,7 +3,6 @@ import type { BaseStore } from "@langchain/langgraph";
 import { GraphState } from "./state.ts";
 import { createCaptureNode } from "./nodes/capture.ts";
 import { createSummarizeNode } from "./nodes/summarize.ts";
-import { createPolicyNode } from "./nodes/policy.ts";
 import { createActionNode } from "./nodes/action.ts";
 import { createMessageNode } from "./nodes/message.ts";
 import { createPersistNode } from "./nodes/persist.ts";
@@ -70,20 +69,6 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     readFileBase64: deps.readFileBase64 ?? readFileBase64,
   });
 
-  const policyNode = createPolicyNode({
-    fs,
-    config: {
-      quietHoursStart: s.quietHoursStart,
-      quietHoursEnd: s.quietHoursEnd,
-      cooldownMinutes: s.cooldownMinutes,
-      confidenceThreshold: s.confidenceThreshold,
-      logDir: s.logDir,
-      historyCount: s.policyHistoryCount,
-    },
-    actionsConfig: config,
-    now: deps.now,
-  });
-
   const actionNode = createActionNode({ ollama, actionsConfig: config, fs, logDir: s.logDir, historyCount: s.actionHistoryCount, digestDays: s.actionDigestDays, now: deps.now });
   const messageNode = createMessageNode({ ollama, actionsConfig: config });
   const persistNode = createPersistNode({
@@ -100,15 +85,13 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   return new StateGraph(GraphState)
     .addNode("capture_node", captureNode)
     .addNode("summarize_node", summarizeNode)
-    .addNode("policy_node", policyNode)
     .addNode("action_node", actionNode)
     .addNode("message_node", messageNode)
     .addNode("persist_node", persistNode)
     .addNode("extract_memories_node", extractMemoriesNode)
     .addEdge(START, "capture_node")
     .addEdge("capture_node", "summarize_node")
-    .addEdge("summarize_node", "policy_node")
-    .addEdge("policy_node", "action_node")
+    .addEdge("summarize_node", "action_node")
     .addEdge("action_node", "message_node")
     .addEdge("message_node", "persist_node")
     .addEdge("persist_node", "extract_memories_node")

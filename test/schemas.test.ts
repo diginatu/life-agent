@@ -1,7 +1,6 @@
 import { test, expect, describe } from "bun:test";
 import { CaptureResultSchema } from "../src/schemas/capture.ts";
 import { SceneSummarySchema } from "../src/schemas/summary.ts";
-import { PolicyDecisionSchema } from "../src/schemas/policy.ts";
 import { ActionSelectionSchema } from "../src/schemas/action.ts";
 import { DraftMessageSchema } from "../src/schemas/message.ts";
 import { LogEntrySchema } from "../src/schemas/log-entry.ts";
@@ -97,61 +96,6 @@ describe("SceneSummarySchema", () => {
   });
 });
 
-describe("PolicyDecisionSchema", () => {
-  test("accepts valid policy decision with all actions available", () => {
-    const result = PolicyDecisionSchema.parse({
-      availableActions: ["none", "log_only", "nudge_break", "nudge_sleep"],
-      cooldownBlocked: false,
-      quietHoursBlocked: false,
-      reasons: [],
-    });
-    expect(result.availableActions).toHaveLength(4);
-    expect(result.reasons).toEqual([]);
-  });
-
-  test("accepts restricted actions with reasons", () => {
-    const result = PolicyDecisionSchema.parse({
-      availableActions: ["none", "log_only"],
-      cooldownBlocked: true,
-      quietHoursBlocked: false,
-      reasons: ["cooldown active: last action 5 min ago"],
-    });
-    expect(result.availableActions).toHaveLength(2);
-    expect(result.reasons).toHaveLength(1);
-  });
-
-  test("rejects empty availableActions", () => {
-    expect(() =>
-      PolicyDecisionSchema.parse({
-        availableActions: [],
-        cooldownBlocked: false,
-        quietHoursBlocked: false,
-        reasons: [],
-      })
-    ).toThrow();
-  });
-
-  test("rejects missing availableActions field", () => {
-    expect(() =>
-      PolicyDecisionSchema.parse({
-        cooldownBlocked: false,
-        quietHoursBlocked: false,
-        reasons: [],
-      })
-    ).toThrow();
-  });
-
-  test("accepts custom action names in availableActions", () => {
-    const result = PolicyDecisionSchema.parse({
-      availableActions: ["none", "nudge_hydrate"],
-      cooldownBlocked: false,
-      quietHoursBlocked: false,
-      reasons: [],
-    });
-    expect(result.availableActions).toEqual(["none", "nudge_hydrate"]);
-  });
-});
-
 describe("ActionSelectionSchema", () => {
   test("accepts valid action selection", () => {
     const result = ActionSelectionSchema.parse({
@@ -209,12 +153,7 @@ describe("LogEntrySchema", () => {
       activityGuess: "coding",
       confidence: 0.8,
     },
-    policy: {
-      availableActions: ["none", "log_only", "nudge_break", "nudge_sleep"] as const,
-      cooldownBlocked: false,
-      quietHoursBlocked: false,
-      reasons: [],
-    },
+    policy: null,
     decision: {
       action: "log_only" as const,
       priority: "low" as const,

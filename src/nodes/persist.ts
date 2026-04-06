@@ -3,7 +3,6 @@ import type { NotifierAdapter } from "../adapters/notifier.ts";
 import type { DiscordAdapter } from "../adapters/discord.ts";
 import type { CaptureResult } from "../schemas/capture.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
-import type { PolicyDecision } from "../schemas/policy.ts";
 import type { ActionSelection } from "../schemas/action.ts";
 import type { DraftMessage } from "../schemas/message.ts";
 import type { Config } from "../config.ts";
@@ -19,7 +18,6 @@ interface PersistNodeDeps {
 interface PersistNodeState {
   capture?: CaptureResult;
   summary?: SceneSummary;
-  policy?: PolicyDecision;
   decision?: ActionSelection;
   message?: DraftMessage | null;
   errors?: string[];
@@ -71,7 +69,7 @@ export function createPersistNode(deps: PersistNodeDeps) {
       timestamp: now.toISOString(),
       capture: state.capture ?? null,
       summary: state.summary ?? null,
-      policy: state.policy ?? null,
+      policy: null,
       decision: state.decision ?? null,
       message: state.message ?? null,
       errors: state.errors ?? [],

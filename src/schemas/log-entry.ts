@@ -1,7 +1,6 @@
 import { z } from "zod/v4";
 import { CaptureResultSchema } from "./capture.ts";
 import { SceneSummarySchema } from "./summary.ts";
-import { PolicyDecisionSchema } from "./policy.ts";
 import { ActionSelectionSchema } from "./action.ts";
 import { DraftMessageSchema } from "./message.ts";
 
@@ -10,7 +9,7 @@ export const LogEntrySchema = z.object({
   timestamp: z.iso.datetime(),
   capture: CaptureResultSchema,
   summary: SceneSummarySchema,
-  policy: PolicyDecisionSchema,
+  policy: z.unknown().nullable(),
   decision: ActionSelectionSchema,
   message: DraftMessageSchema.nullable(),
   errors: z.array(z.string()),
