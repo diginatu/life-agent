@@ -16,10 +16,6 @@ settings:
   captureWidth: 640
   captureHeight: 480
 
-  # Quiet hours (24h format) — no active nudges during this window
-  quietHoursStart: 23
-  quietHoursEnd: 7
-
   # Default minimum minutes between nudge notifications (per action)
   cooldownMinutes: 30
 

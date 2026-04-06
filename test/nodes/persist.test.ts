@@ -67,7 +67,6 @@ const baseState = {
   policy: {
     availableActions: ["none", "log_only", "nudge_break", "nudge_sleep"] as const,
     cooldownBlocked: false,
-    quietHoursBlocked: false,
     reasons: [],
   },
   decision: {
