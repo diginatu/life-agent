@@ -1,6 +1,6 @@
 ## Project Overview
 
-Life Agent captures webcam images, analyzes them with a local LLM (Ollama), and sends desktop notifications for wellness nudges (break reminders, sleep prompts).
+Life Agent captures webcam images, analyzes them with a local LLM (Ollama), and sends Discord notifications for wellness nudges (break reminders, sleep prompts).
 
 ## Architecture
 
@@ -10,7 +10,7 @@ Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore fo
 
 ## Key Patterns
 
-- **Adapter DI**: External services (Ollama, filesystem, ffmpeg, notifier) injected as interfaces. `--dry-run` uses mocks.
+- **Adapter DI**: External services (Ollama, filesystem, ffmpeg, Discord) injected as interfaces. `--dry-run` uses mocks.
 - **Config**: Zod-validated YAML (`config.yml` + `config.local.yml` override). Actions are data-driven.
 - **Policy engine**: Quiet hours, cooldown, confidence threshold, duplicate suppression gate active actions.
 - **Long-term memory**: `FileStore` (custom `BaseStore` subclass) persists learned user patterns to `{memoryDir}/store.json`. ExtractMemories node writes; Action node reads.

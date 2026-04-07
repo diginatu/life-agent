@@ -10,13 +10,11 @@ import { createExtractMemoriesNode } from "./nodes/extract-memories.ts";
 import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
 import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
 import { createFilesystemAdapter } from "./adapters/filesystem.ts";
-import { createNotifierAdapter } from "./adapters/notifier.ts";
 import { createDiscordAdapter } from "./adapters/discord.ts";
 import { FileStore } from "./store/file-store.ts";
 import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "./adapters/ollama.ts";
 import type { FilesystemAdapter } from "./adapters/filesystem.ts";
-import type { NotifierAdapter } from "./adapters/notifier.ts";
 import type { DiscordAdapter } from "./adapters/discord.ts";
 import type { Config } from "./config.ts";
 
@@ -24,7 +22,6 @@ interface GraphDeps {
   ffmpeg?: FfmpegAdapter;
   ollama?: OllamaAdapter;
   fs?: FilesystemAdapter;
-  notifier?: NotifierAdapter;
   discord?: DiscordAdapter;
   store?: BaseStore;
   readFileBase64?: (path: string) => Promise<string>;
@@ -42,10 +39,8 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   const ffmpeg = deps.ffmpeg ?? createFfmpegAdapter();
   const ollama = deps.ollama ?? createOllamaAdapterFromConfig(s);
   const fs = deps.fs ?? createFilesystemAdapter();
-  const notifier = deps.notifier ?? createNotifierAdapter();
-
   let discord: DiscordAdapter | undefined = deps.discord;
-  if (!discord && s.discordEnabled && s.discordChannelId) {
+  if (!discord && s.discordChannelId) {
     const token = process.env.DISCORD_BOT_TOKEN;
     if (token) {
       discord = await createDiscordAdapter(token, s.discordChannelId);
@@ -73,7 +68,6 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   const messageNode = createMessageNode({ ollama, actionsConfig: config });
   const persistNode = createPersistNode({
     fs,
-    notifier,
     config: { logDir: s.logDir },
     actionsConfig: config,
     discord,

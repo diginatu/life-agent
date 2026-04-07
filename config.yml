@@ -37,12 +37,11 @@ settings:
   # Number of recent log entries used by the policy node for cooldown/duplicate checks
   policyHistoryCount: 5
 
-  # Discord integration (optional, disabled by default)
-  discordEnabled: false
+  # Discord channel ID (set to enable Discord notifications)
   discordChannelId: ""
 
 # Action definitions
-# - active: true = triggers desktop notification; false = log-only
+# - active: true = triggers Discord notification; false = log-only
 # - description: context given to the LLM when selecting actions
 # - fallback: notification shown when LLM message drafting fails (required for active actions)
 # - cooldownMinutes: override global cooldown for this action (optional)

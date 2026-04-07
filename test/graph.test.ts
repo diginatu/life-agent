@@ -3,7 +3,6 @@ import { buildGraph } from "../src/graph.ts";
 import type { FfmpegAdapter } from "../src/adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "../src/adapters/ollama.ts";
 import type { FilesystemAdapter } from "../src/adapters/filesystem.ts";
-import type { NotifierAdapter } from "../src/adapters/notifier.ts";
 import { mockActionsConfig } from "./helpers/mock-config.ts";
 
 function mockFfmpeg(success: boolean, stderr = ""): FfmpegAdapter {
@@ -59,10 +58,6 @@ function mockFs(lastEntries: unknown[] = []): FilesystemAdapter {
   };
 }
 
-function mockNotifier(): NotifierAdapter {
-  return { notify: async () => {} };
-}
-
 const mockReadFile = async () => "fakebase64";
 
 function allMocks(overrides: {
@@ -81,7 +76,6 @@ function allMocks(overrides: {
       error: overrides.ollamaError,
     }),
     fs: mockFs(overrides.fsEntries ?? []),
-    notifier: mockNotifier(),
     readFileBase64: mockReadFile,
     now: () => new Date("2026-03-29T14:00:00"),
   };

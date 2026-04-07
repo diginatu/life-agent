@@ -18,7 +18,7 @@ if (isDigest) {
     : new Date().toISOString().slice(0, 10);
 
   let discord;
-  if (config.settings.discordEnabled && config.settings.discordChannelId) {
+  if (config.settings.discordChannelId) {
     const token = process.env.DISCORD_BOT_TOKEN;
     if (token) {
       const { createDiscordAdapter } = await import("./adapters/discord.ts");
@@ -55,7 +55,7 @@ if (isDigest) {
     console.log(`\nAuto-digest: generating digest for ${yesterday}`);
 
     let discord;
-    if (!isDryRun && config.settings.discordEnabled && config.settings.discordChannelId) {
+    if (!isDryRun && config.settings.discordChannelId) {
       const token = process.env.DISCORD_BOT_TOKEN;
       if (token) {
         const { createDiscordAdapter } = await import("./adapters/discord.ts");

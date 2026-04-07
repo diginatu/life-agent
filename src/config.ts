@@ -14,7 +14,6 @@ const SettingsSchema = z.object({
   digestContextDays: z.number().int().nonnegative().default(3),
   memoryDir: z.string().default("./memory"),
   webPort: z.number().int().positive().default(3000),
-  discordEnabled: z.boolean().default(false),
   discordChannelId: z.string().default(""),
 });
 

@@ -8,7 +8,7 @@ LifeAgent is a local-first personal life assistant that captures periodic webcam
 - [Ollama](https://ollama.ai/) with `gemma3:12b` model pulled
 - A webcam accessible at `/dev/video0` (or configure via `WEBCAM_DEVICE`)
 - `ffmpeg` installed (for frame capture)
-- `notify-send` installed (for desktop notifications, usually part of `libnotify`)
+
 
 ## Setup
 
@@ -95,7 +95,7 @@ The agent runs a 6-node LangGraph pipeline on each invocation:
 3. **Policy** — applies deterministic rules (quiet hours, cooldown, dedup)
 4. **Action** — LLM selects an action from the allowed set
 5. **Message** — LLM drafts a notification message (if needed)
-6. **Persist** — writes JSONL log + sends desktop notification
+6. **Persist** — writes JSONL log + sends Discord notification
 
 Actions: `none` | `log_only` | `nudge_break` | `nudge_sleep`
 

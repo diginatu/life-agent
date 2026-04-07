@@ -2,7 +2,6 @@ import { InMemoryStore } from "@langchain/langgraph";
 import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "./adapters/ollama.ts";
 import type { FilesystemAdapter } from "./adapters/filesystem.ts";
-import type { NotifierAdapter } from "./adapters/notifier.ts";
 import type { DiscordAdapter } from "./adapters/discord.ts";
 
 const summaryJson = JSON.stringify({
@@ -48,12 +47,6 @@ export function createDryRunDeps() {
     readLastNLines: async () => [],
   };
 
-  const notifier: NotifierAdapter = {
-    notify: async (title, body) => {
-      console.log(`[dry-run] Would send notification: "${title}" — ${body}`);
-    },
-  };
-
   const discord: DiscordAdapter = {
     sendEmbed: async (title, body) => {
       console.log(`[dry-run] Would send Discord embed: "${title}" — ${body}`);
@@ -67,5 +60,5 @@ export function createDryRunDeps() {
 
   const store = new InMemoryStore();
 
-  return { ffmpeg, ollama, fs, notifier, discord, readFileBase64, store };
+  return { ffmpeg, ollama, fs, discord, readFileBase64, store };
 }

@@ -28,15 +28,14 @@ actions:
   expect(config.settings.webPort).toBe(8080);
 });
 
-test("discordEnabled defaults to false", () => {
+test("discordChannelId defaults to empty string", () => {
   const config = loadConfig(minimalYaml);
-  expect(config.settings.discordEnabled).toBe(false);
+  expect(config.settings.discordChannelId).toBe("");
 });
 
-test("discordEnabled and discordChannelId are parsed from YAML", () => {
+test("discordChannelId is parsed from YAML", () => {
   const yaml = `
 settings:
-  discordEnabled: true
   discordChannelId: "123456789"
 actions:
   none:
@@ -45,7 +44,6 @@ actions:
     active: false
 `;
   const config = loadConfig(yaml);
-  expect(config.settings.discordEnabled).toBe(true);
   expect(config.settings.discordChannelId).toBe("123456789");
 });
 

@@ -1,5 +1,4 @@
 import type { FilesystemAdapter } from "../adapters/filesystem.ts";
-import type { NotifierAdapter } from "../adapters/notifier.ts";
 import type { DiscordAdapter } from "../adapters/discord.ts";
 import type { CaptureResult } from "../schemas/capture.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
@@ -9,7 +8,6 @@ import type { Config } from "../config.ts";
 
 interface PersistNodeDeps {
   fs: FilesystemAdapter;
-  notifier: NotifierAdapter;
   config: { logDir: string };
   actionsConfig: Config;
   discord?: DiscordAdapter;
@@ -28,7 +26,7 @@ interface PersistNodeResult {
 }
 
 export function createPersistNode(deps: PersistNodeDeps) {
-  const { fs, notifier, config, actionsConfig, discord } = deps;
+  const { fs, config, actionsConfig, discord } = deps;
 
   return async (state: PersistNodeState): Promise<PersistNodeResult> => {
     const now = new Date();
@@ -103,16 +101,6 @@ export function createPersistNode(deps: PersistNodeDeps) {
       const msg = `persist: fs write error: ${err instanceof Error ? err.message : String(err)}`;
       console.error(msg);
       return { errors: [msg] };
-    }
-
-    // Send desktop notification for active actions with a message
-    if (state.decision && actionsConfig.isActiveAction(state.decision.action) && state.message) {
-      try {
-        await notifier.notify(state.message.title, state.message.body);
-      } catch (err) {
-        const msg = `persist: notify error: ${err instanceof Error ? err.message : String(err)}`;
-        console.error(msg);
-      }
     }
 
     // Print one-line summary
