@@ -26,6 +26,7 @@ function mockNotifier(): NotifierAdapter & { notifications: Array<{ title: strin
 
 function mockDiscord(
   replies: Array<{ text: string; userId: string; timestamp: string }> = [],
+  latestMessageId: string | null = "latest-channel-msg",
 ): DiscordAdapter & { embeds: Array<{ title: string; body: string }> } {
   let msgCounter = 0;
   const embeds: Array<{ title: string; body: string }> = [];
@@ -38,6 +39,7 @@ function mockDiscord(
     },
     collectReplies: async () => replies,
     destroy: async () => {},
+    getLatestMessageId: async () => latestMessageId,
   };
 }
 
@@ -250,6 +252,72 @@ describe("persist node", () => {
     const feedback = entry.feedbackFromPrevious as Array<Record<string, string>>;
     expect(feedback).toHaveLength(1);
     expect(feedback[0]!.text).toBe("ok thanks");
+  });
+
+  test("collects feedback using discordLastSeenMessageId when no discordMessageId in prev entry", async () => {
+    const previousEntries = [
+      {
+        discordLastSeenMessageId: "prev-seen-id",
+        decision: { action: "log_only" },
+      },
+    ];
+    const fsWithPrev = mockFsWithPrevEntries(previousEntries);
+    const notifier = mockNotifier();
+    const discord = mockDiscord([
+      { text: "feedback without embed", userId: "user2", timestamp: "2026-03-29T15:00:00.000Z" },
+    ]);
+    const node = createPersistNode({ fs: fsWithPrev, notifier, config: { logDir: "./logs" }, actionsConfig, discord });
+
+    await node(baseState);
+
+    const entry = fsWithPrev.written[0] as Record<string, unknown>;
+    const feedback = entry.feedbackFromPrevious as Array<Record<string, string>>;
+    expect(feedback).toHaveLength(1);
+    expect(feedback[0]!.text).toBe("feedback without embed");
+  });
+
+  test("stores discordLastSeenMessageId when no embed is sent", async () => {
+    const fs = mockFs();
+    const notifier = mockNotifier();
+    const discord = mockDiscord();
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig, discord });
+
+    await node(baseState);
+
+    const entry = fs.written[0] as Record<string, unknown>;
+    expect(entry.discordLastSeenMessageId).toBe("latest-channel-msg");
+    expect(entry.discordMessageId).toBeUndefined();
+  });
+
+  test("does not store discordLastSeenMessageId when embed is sent", async () => {
+    const fs = mockFs();
+    const notifier = mockNotifier();
+    const discord = mockDiscord();
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig, discord });
+
+    const state = {
+      ...baseState,
+      decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
+      message: { title: "Break time!", body: "Stand up and stretch." },
+    };
+    await node(state);
+
+    const entry = fs.written[0] as Record<string, unknown>;
+    expect(entry.discordMessageId).toBeTruthy();
+    expect(entry.discordLastSeenMessageId).toBeUndefined();
+  });
+
+  test("handles getLatestMessageId returning null gracefully", async () => {
+    const fs = mockFs();
+    const notifier = mockNotifier();
+    const discord = mockDiscord([], null);
+    const node = createPersistNode({ fs, notifier, config: { logDir: "./logs" }, actionsConfig, discord });
+
+    await node(baseState);
+
+    const entry = fs.written[0] as Record<string, unknown>;
+    expect(entry.discordLastSeenMessageId).toBeUndefined();
+    expect(entry.discordMessageId).toBeUndefined();
   });
 
   test("prints one-line summary to stdout", async () => {

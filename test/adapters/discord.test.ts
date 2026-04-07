@@ -148,6 +148,45 @@ describe("DiscordAdapter", () => {
     });
   });
 
+  describe("getLatestMessageId", () => {
+    test("returns the ID of the latest message", async () => {
+      const messages = new Map<string, MockMessage>([
+        [
+          "latest-msg-id",
+          {
+            content: "Latest message",
+            author: { id: "user1", bot: false },
+            createdAt: new Date("2024-01-01T12:00:00Z"),
+          },
+        ],
+      ]);
+
+      const channel = makeChannel({
+        messages: {
+          fetch: async () => messages as Map<string, MockMessage>,
+        },
+      });
+
+      const adapter = createDiscordAdapterFromChannel(channel, makeClient());
+      const latestId = await adapter.getLatestMessageId();
+
+      expect(latestId).toBe("latest-msg-id");
+    });
+
+    test("returns null when channel has no messages", async () => {
+      const channel = makeChannel({
+        messages: {
+          fetch: async () => new Map<string, MockMessage>(),
+        },
+      });
+
+      const adapter = createDiscordAdapterFromChannel(channel, makeClient());
+      const latestId = await adapter.getLatestMessageId();
+
+      expect(latestId).toBeNull();
+    });
+  });
+
   describe("destroy", () => {
     test("calls client.destroy", async () => {
       let destroyCalled = false;

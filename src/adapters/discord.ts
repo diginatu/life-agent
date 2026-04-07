@@ -3,7 +3,7 @@ import { Client, GatewayIntentBits } from "discord.js";
 export interface DiscordChannel {
   send(options: unknown): Promise<{ id: string }>;
   messages: {
-    fetch(options: { after: string }): Promise<Map<string, { content: string; author: { id: string; bot: boolean }; createdAt: Date }>>;
+    fetch(options: { after: string } | { limit: number }): Promise<Map<string, { content: string; author: { id: string; bot: boolean }; createdAt: Date }>>;
   };
 }
 
@@ -14,6 +14,7 @@ export interface DiscordClient {
 export interface DiscordAdapter {
   sendEmbed(title: string, body: string): Promise<string>;
   collectReplies(afterMessageId: string): Promise<{ text: string; userId: string; timestamp: string }[]>;
+  getLatestMessageId(): Promise<string | null>;
   destroy(): Promise<void>;
 }
 
@@ -37,6 +38,13 @@ export function createDiscordAdapterFromChannel(channel: DiscordChannel, client:
         }
       }
       return replies;
+    },
+
+    async getLatestMessageId(): Promise<string | null> {
+      const messages = await channel.messages.fetch({ limit: 1 });
+      if (messages.size === 0) return null;
+      const [id] = messages.keys();
+      return id!;
     },
 
     async destroy(): Promise<void> {

@@ -41,7 +41,7 @@ export function createPersistNode(deps: PersistNodeDeps) {
         const lastEntries = await fs.readLastNLines(config.logDir, dateStr, 1);
         if (lastEntries.length > 0) {
           const prevEntry = lastEntries[lastEntries.length - 1] as Record<string, unknown>;
-          const prevMsgId = prevEntry.discordMessageId as string | undefined;
+          const prevMsgId = (prevEntry.discordMessageId ?? prevEntry.discordLastSeenMessageId) as string | undefined;
           if (prevMsgId) {
             const replies = await discord.collectReplies(prevMsgId);
             if (replies.length > 0) {
@@ -64,6 +64,16 @@ export function createPersistNode(deps: PersistNodeDeps) {
       }
     }
 
+    // Get latest message ID as cursor for next cycle when no embed was sent
+    let discordLastSeenMessageId: string | null = null;
+    if (discord && !discordMessageId) {
+      try {
+        discordLastSeenMessageId = await discord.getLatestMessageId();
+      } catch (err) {
+        console.error(`persist: discord getLatestMessageId error: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
     const logEntry: Record<string, unknown> = {
       eventId: crypto.randomUUID(),
       timestamp: now.toISOString(),
@@ -78,6 +88,9 @@ export function createPersistNode(deps: PersistNodeDeps) {
 
     if (discordMessageId) {
       logEntry.discordMessageId = discordMessageId;
+    }
+    if (discordLastSeenMessageId) {
+      logEntry.discordLastSeenMessageId = discordLastSeenMessageId;
     }
     if (feedbackFromPrevious) {
       logEntry.feedbackFromPrevious = feedbackFromPrevious;
