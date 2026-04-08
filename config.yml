@@ -16,12 +16,6 @@ settings:
   captureWidth: 640
   captureHeight: 480
 
-  # Default minimum minutes between nudge notifications (per action)
-  cooldownMinutes: 30
-
-  # Minimum confidence to consider acting
-  confidenceThreshold: 0.3
-
   # Number of recent log entries passed to the action LLM for context
   actionHistoryCount: 10
 
@@ -34,9 +28,6 @@ settings:
   # Directory for long-term memory store (learned user patterns)
   memoryDir: ./memory
 
-  # Number of recent log entries used by the policy node for cooldown/duplicate checks
-  policyHistoryCount: 5
-
   # Discord channel ID (set to enable Discord notifications)
   discordChannelId: ""
 
@@ -44,7 +35,6 @@ settings:
 # - active: true = triggers Discord notification; false = log-only
 # - description: context given to the LLM when selecting actions
 # - fallback: notification shown when LLM message drafting fails (required for active actions)
-# - cooldownMinutes: override global cooldown for this action (optional)
 actions:
   none:
     active: false
