@@ -2,6 +2,7 @@ import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { ActionSelection } from "../schemas/action.ts";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/seed-actions.ts";
 
 interface ExtractMemoriesNodeDeps {
   ollama: OllamaAdapter;
@@ -36,12 +37,19 @@ function buildExtractionPrompt(
   summary: SceneSummary,
   decision: ActionSelection | undefined,
   existingMemories: Array<{ key: string; value: Record<string, unknown> }>,
+  actionDefinitions: Array<{ key: string; value: Record<string, unknown> }>,
 ): string {
   const memorySection = existingMemories.length > 0
     ? `## Existing Known Patterns\n${existingMemories.map((m) =>
       `- [${m.key}] ${m.value.content} (category: ${m.value.category}, observed ${m.value.observedCount} times)`
     ).join("\n")}`
     : "## Existing Known Patterns\nNone yet.";
+
+  const actionDefsSection = actionDefinitions.length > 0
+    ? `## Current Action Definitions\n${actionDefinitions.map((d) =>
+      `- [${d.key}] ${d.value.description}`
+    ).join("\n")}`
+    : "";
 
   const observation = [
     `Person present: ${summary.personPresent}`,
@@ -53,10 +61,10 @@ function buildExtractionPrompt(
     decision ? `Action taken: ${decision.action} (${decision.reason})` : null,
   ].filter(Boolean).join("\n");
 
-  return `You are a behavioral pattern analyzer. Given a current observation and existing known patterns, identify any new behavioral patterns or confirm existing ones.
+  return `You are a behavioral pattern analyzer. Given a current observation and existing known patterns, identify any new behavioral patterns or confirm existing ones. You may also suggest refinements to action definitions based on observed feedback.
 
 ${memorySection}
-
+${actionDefsSection ? `\n${actionDefsSection}\n` : ""}
 ## Current Observation
 ${observation}
 
@@ -67,12 +75,33 @@ ${observation}
 - Use kebab-case keys (e.g., "sleep-late", "takes-bath-before-bed", "codes-at-night")
 - Categories: "sleep", "activity", "routine", "preference", "wellness"
 - Only include patterns you are reasonably confident about
-- If nothing noteworthy, return an empty array
+- If user feedback suggests an action definition should be refined, include an actionUpdate
 
-Return a JSON array (no markdown wrapping):
-[{"key": "pattern-key", "content": "Description of the pattern", "category": "category"}]
+Return a JSON object (no markdown wrapping):
+{
+  "patterns": [{"key": "pattern-key", "content": "Description of the pattern", "category": "category"}],
+  "actionUpdates": [{"key": "action-name", "description": "Refined description based on feedback"}]
+}
 
-If no patterns detected, return: []`;
+If nothing noteworthy: {"patterns": [], "actionUpdates": []}`;
+}
+
+interface ActionUpdate {
+  key: string;
+  description: string;
+}
+
+interface LlmResponse {
+  patterns: ExtractedPattern[];
+  actionUpdates: ActionUpdate[];
+}
+
+function parseLlmResponse(jsonStr: string): LlmResponse {
+  const parsed = JSON.parse(jsonStr);
+  return {
+    patterns: Array.isArray(parsed.patterns) ? parsed.patterns : [],
+    actionUpdates: Array.isArray(parsed.actionUpdates) ? parsed.actionUpdates : [],
+  };
 }
 
 export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
@@ -83,18 +112,25 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
     }
 
     try {
-      const existingItems = await store.search(MEMORY_NAMESPACE, { limit: 50 });
+      const [existingItems, actionDefItems] = await Promise.all([
+        store.search(MEMORY_NAMESPACE, { limit: 50 }),
+        store.search(ACTION_DEFS_NAMESPACE, { limit: 50 }),
+      ]);
+
       const existingMemories = existingItems.map((item) => ({
         key: item.key,
         value: item.value,
       }));
 
-      const prompt = buildExtractionPrompt(state.summary, state.decision, existingMemories);
+      const actionDefinitions = actionDefItems.map((item) => ({
+        key: item.key,
+        value: item.value,
+      }));
+
+      const prompt = buildExtractionPrompt(state.summary, state.decision, existingMemories, actionDefinitions);
       const response = await deps.ollama.generate(prompt);
       const jsonStr = extractJson(response);
-      const patterns: ExtractedPattern[] = JSON.parse(jsonStr);
-
-      if (!Array.isArray(patterns)) return {};
+      const { patterns, actionUpdates } = parseLlmResponse(jsonStr);
 
       const now = new Date().toISOString();
 
@@ -121,8 +157,23 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
           });
         }
       }
+
+      for (const update of actionUpdates) {
+        if (!update.key || !update.description) continue;
+
+        const existing = await store.get(ACTION_DEFS_NAMESPACE, update.key);
+        if (existing) {
+          const record: ActionDefinitionRecord = {
+            ...(existing.value as ActionDefinitionRecord),
+            description: update.description,
+            source: "learned",
+            updatedAt: now,
+          };
+          await store.put(ACTION_DEFS_NAMESPACE, update.key, record);
+        }
+      }
     } catch {
-      // Best-effort: memory extraction should never break the pipeline
+      // best-effort
     }
 
     return {};

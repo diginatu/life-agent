@@ -5,6 +5,7 @@ import type { SceneSummary } from "../schemas/summary.ts";
 import type { Config } from "../config.ts";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { collectPreviousDigests } from "../digest/cli.ts";
+import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/seed-actions.ts";
 
 interface MemoryInfo {
   key: string;
@@ -110,11 +111,11 @@ function formatHistory(entries: LogEntry[], digestInfos?: DigestInfo[]): { histo
   };
 }
 
-function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[], memories?: MemoryInfo[]): string {
+function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[], memories?: MemoryInfo[], actionDefs?: Map<string, string>): string {
   const allActions = actionsConfig.getActionNames();
   const actionDescriptions = allActions
     .map((a) => {
-      const desc = actionsConfig.getDescription(a);
+      const desc = actionDefs?.get(a) ?? actionsConfig.getDescription(a);
       return desc ? `  - ${a}: ${desc}` : `  - ${a}`;
     })
     .join("\n");
@@ -197,9 +198,14 @@ export function createActionNode(deps: ActionNodeDeps) {
     }
 
     let memories: MemoryInfo[] | undefined;
+    let actionDefs: Map<string, string> | undefined;
     try {
       if (config?.store) {
-        const items = await config.store.search(["user", "patterns"], { limit: 20 });
+        const [items, defItems] = await Promise.all([
+          config.store.search(["user", "patterns"], { limit: 20 }),
+          config.store.search(ACTION_DEFS_NAMESPACE, { limit: 50 }),
+        ]);
+
         if (items.length > 0) {
           memories = items.map((item) => ({
             key: item.key,
@@ -208,12 +214,16 @@ export function createActionNode(deps: ActionNodeDeps) {
             observedCount: (item.value.observedCount as number) ?? 1,
           }));
         }
+
+        if (defItems.length > 0) {
+          actionDefs = new Map(defItems.map((i) => [i.key, (i.value as ActionDefinitionRecord).description]));
+        }
       }
     } catch {
-      // Memory reading is best-effort
+      // best-effort
     }
 
-    const prompt = buildPrompt(state.summary, deps.actionsConfig, currentTime, logEntries, digestInfos, memories);
+    const prompt = buildPrompt(state.summary, deps.actionsConfig, currentTime, logEntries, digestInfos, memories, actionDefs);
 
     let rawResponse: string;
     try {

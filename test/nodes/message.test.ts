@@ -2,6 +2,8 @@ import { test, expect, describe } from "bun:test";
 import { createMessageNode } from "../../src/nodes/message.ts";
 import { DraftMessageSchema } from "../../src/schemas/message.ts";
 import type { OllamaAdapter } from "../../src/adapters/ollama.ts";
+import { InMemoryStore } from "@langchain/langgraph";
+import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { mockActionsConfig } from "../helpers/mock-config.ts";
 
 const actionsConfig = mockActionsConfig();
@@ -151,6 +153,51 @@ describe("message node", () => {
     };
     const node = createMessageNode({ ollama: capturingOllama, actionsConfig });
     await node(makeState("nudge_break"));
+
+    expect(capturedPrompt).toContain("Suggest the user take a short break");
+  });
+});
+
+describe("message node with action definitions in store", () => {
+  test("uses store description instead of config description", async () => {
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_break", {
+      description: "Learned: suggest break after long coding session",
+      source: "learned",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validMessageJson;
+      },
+      generateWithImage: async () => validMessageJson,
+    };
+
+    const node = createMessageNode({ ollama: capturingOllama, actionsConfig });
+    const config = { store } as LangGraphRunnableConfig;
+    await node(makeState("nudge_break"), config);
+
+    expect(capturedPrompt).toContain("Learned: suggest break after long coding session");
+    expect(capturedPrompt).not.toContain("Suggest the user take a short break");
+  });
+
+  test("falls back to config description when store has no definition", async () => {
+    const store = new InMemoryStore();
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validMessageJson;
+      },
+      generateWithImage: async () => validMessageJson,
+    };
+
+    const node = createMessageNode({ ollama: capturingOllama, actionsConfig });
+    const config = { store } as LangGraphRunnableConfig;
+    await node(makeState("nudge_break"), config);
 
     expect(capturedPrompt).toContain("Suggest the user take a short break");
   });

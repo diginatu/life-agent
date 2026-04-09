@@ -30,9 +30,12 @@ describe("extract_memories node", () => {
   test("extracts new pattern and writes to store", async () => {
     const store = new InMemoryStore();
     const ollama: OllamaAdapter = {
-      generate: async () => JSON.stringify([
-        { key: "sleep-late", content: "User is active at 2am, likely a night owl", category: "sleep" },
-      ]),
+      generate: async () => JSON.stringify({
+        patterns: [
+          { key: "sleep-late", content: "User is active at 2am, likely a night owl", category: "sleep" },
+        ],
+        actionUpdates: [],
+      }),
       generateWithImage: async () => "",
     };
 
@@ -50,7 +53,7 @@ describe("extract_memories node", () => {
   test("returns empty array when LLM finds no patterns", async () => {
     const store = new InMemoryStore();
     const ollama: OllamaAdapter = {
-      generate: async () => "[]",
+      generate: async () => JSON.stringify({ patterns: [], actionUpdates: [] }),
       generateWithImage: async () => "",
     };
 
@@ -74,9 +77,12 @@ describe("extract_memories node", () => {
     });
 
     const ollama: OllamaAdapter = {
-      generate: async () => JSON.stringify([
-        { key: "sleep-late", content: "User is active at 2am, confirmed night owl", category: "sleep" },
-      ]),
+      generate: async () => JSON.stringify({
+        patterns: [
+          { key: "sleep-late", content: "User is active at 2am, confirmed night owl", category: "sleep" },
+        ],
+        actionUpdates: [],
+      }),
       generateWithImage: async () => "",
     };
 
@@ -92,7 +98,7 @@ describe("extract_memories node", () => {
 
   test("completes without error when store is unavailable", async () => {
     const ollama: OllamaAdapter = {
-      generate: async () => "[]",
+      generate: async () => JSON.stringify({ patterns: [], actionUpdates: [] }),
       generateWithImage: async () => "",
     };
 
@@ -178,7 +184,10 @@ describe("extract_memories node", () => {
   test("handles LLM response wrapped in code block", async () => {
     const store = new InMemoryStore();
     const ollama: OllamaAdapter = {
-      generate: async () => "```json\n[\n  { \"key\": \"bath-routine\", \"content\": \"Takes bath before bed\", \"category\": \"routine\" }\n]\n```",
+      generate: async () => "```json\n" + JSON.stringify({
+        patterns: [{ key: "bath-routine", content: "Takes bath before bed", category: "routine" }],
+        actionUpdates: [],
+      }) + "\n```",
       generateWithImage: async () => "",
     };
 
@@ -188,5 +197,117 @@ describe("extract_memories node", () => {
     const items = await store.search(["user", "patterns"], { limit: 10 });
     expect(items).toHaveLength(1);
     expect(items[0].key).toBe("bath-routine");
+  });
+});
+
+describe("extract_memories action definition evolution", () => {
+  test("updates action definition in store when LLM returns actionUpdates", async () => {
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_break", {
+      description: "Suggest the user take a short break",
+      source: "seed",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const ollama: OllamaAdapter = {
+      generate: async () => JSON.stringify({
+        patterns: [],
+        actionUpdates: [
+          { key: "nudge_break", description: "Suggest break after 2h of focused coding — user responds well to this" },
+        ],
+      }),
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(makeState(), makeConfig(store));
+
+    const item = await store.get(["actions", "definitions"], "nudge_break");
+    expect(item).not.toBeNull();
+    expect(item!.value.description).toBe("Suggest break after 2h of focused coding — user responds well to this");
+    expect(item!.value.source).toBe("learned");
+  });
+
+  test("leaves action definitions unchanged when actionUpdates is empty", async () => {
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_break", {
+      description: "Original description",
+      source: "seed",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const ollama: OllamaAdapter = {
+      generate: async () => JSON.stringify({
+        patterns: [],
+        actionUpdates: [],
+      }),
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(makeState(), makeConfig(store));
+
+    const item = await store.get(["actions", "definitions"], "nudge_break");
+    expect(item!.value.description).toBe("Original description");
+    expect(item!.value.source).toBe("seed");
+  });
+
+  test("includes current action definitions in LLM prompt", async () => {
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_break", {
+      description: "Suggest the user take a short break",
+      source: "seed",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    let capturedPrompt = "";
+    const ollama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        capturedPrompt = prompt;
+        return "[]";
+      },
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(makeState(), makeConfig(store));
+
+    expect(capturedPrompt).toContain("Current Action Definitions");
+    expect(capturedPrompt).toContain("nudge_break");
+    expect(capturedPrompt).toContain("Suggest the user take a short break");
+  });
+
+  test("processes both patterns and actionUpdates in same response", async () => {
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_sleep", {
+      description: "Suggest sleep",
+      source: "seed",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const ollama: OllamaAdapter = {
+      generate: async () => JSON.stringify({
+        patterns: [
+          { key: "codes-at-night", content: "User codes late at night", category: "activity" },
+        ],
+        actionUpdates: [
+          { key: "nudge_sleep", description: "Suggest sleep when coding past midnight" },
+        ],
+      }),
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(makeState(), makeConfig(store));
+
+    // Pattern was written
+    const pattern = await store.get(["user", "patterns"], "codes-at-night");
+    expect(pattern).not.toBeNull();
+    expect(pattern!.value.content).toBe("User codes late at night");
+
+    // Action definition was updated
+    const def = await store.get(["actions", "definitions"], "nudge_sleep");
+    expect(def!.value.description).toBe("Suggest sleep when coding past midnight");
+    expect(def!.value.source).toBe("learned");
   });
 });

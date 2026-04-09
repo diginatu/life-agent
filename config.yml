@@ -33,7 +33,7 @@ settings:
 
 # Action definitions
 # - active: true = triggers Discord notification; false = log-only
-# - description: context given to the LLM when selecting actions
+# - description: seed value for LLM context; evolved at runtime via memory store
 # - fallback: notification shown when LLM message drafting fails (required for active actions)
 actions:
   none:

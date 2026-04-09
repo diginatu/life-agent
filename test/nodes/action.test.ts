@@ -471,3 +471,74 @@ describe("action node with memory store", () => {
     expect(capturedPrompt).not.toContain("Known user patterns");
   });
 });
+
+describe("action node with action definitions in store", () => {
+  test("uses store descriptions instead of config descriptions", async () => {
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_break", {
+      description: "Learned: suggest break after 2h of focused coding",
+      source: "learned",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    const config = { store } as LangGraphRunnableConfig;
+    await node(makeState(), config);
+
+    expect(capturedPrompt).toContain("Learned: suggest break after 2h of focused coding");
+    expect(capturedPrompt).not.toContain("Suggest the user take a short break");
+  });
+
+  test("falls back to config description when store has no definition", async () => {
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_break", {
+      description: "Store version of break nudge",
+      source: "seed",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    const config = { store } as LangGraphRunnableConfig;
+    await node(makeState(), config);
+
+    // nudge_break uses store description
+    expect(capturedPrompt).toContain("Store version of break nudge");
+    // nudge_sleep falls back to config description
+    expect(capturedPrompt).toContain("Suggest the user go to sleep");
+  });
+
+  test("falls back to config descriptions when no store available", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("Suggest the user take a short break");
+    expect(capturedPrompt).toContain("Suggest the user go to sleep");
+  });
+});
