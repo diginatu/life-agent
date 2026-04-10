@@ -3,7 +3,7 @@ import type { SceneSummary } from "../schemas/summary.ts";
 import type { ActionSelection } from "../schemas/action.ts";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/seed-actions.ts";
-import { mergeDuplicatePatterns } from "../store/merge-patterns.ts";
+import { mergeDuplicatePatterns, extractJson, PATTERNS_NAMESPACE } from "../store/merge-patterns.ts";
 import { capUserPatterns } from "../store/cap-patterns.ts";
 
 interface ExtractMemoriesNodeDeps {
@@ -25,16 +25,6 @@ interface ExtractedPattern {
   key: string;
   content: string;
   category: string;
-}
-
-const MEMORY_NAMESPACE = ["user", "patterns"];
-
-function extractJson(text: string): string {
-  const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-  if (codeBlockMatch) {
-    return codeBlockMatch[1]!.trim();
-  }
-  return text.trim();
 }
 
 function buildExtractionPrompt(
@@ -117,7 +107,7 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
 
     try {
       const [existingItems, actionDefItems] = await Promise.all([
-        store.search(MEMORY_NAMESPACE, { limit: 50 }),
+        store.search(PATTERNS_NAMESPACE, { limit: 50 }),
         store.search(ACTION_DEFS_NAMESPACE, { limit: 50 }),
       ]);
 
@@ -141,10 +131,10 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
       for (const pattern of patterns) {
         if (!pattern.key || !pattern.content || !pattern.category) continue;
 
-        const existing = await store.get(MEMORY_NAMESPACE, pattern.key);
+        const existing = await store.get(PATTERNS_NAMESPACE, pattern.key);
 
         if (existing) {
-          await store.put(MEMORY_NAMESPACE, pattern.key, {
+          await store.put(PATTERNS_NAMESPACE, pattern.key, {
             ...existing.value,
             content: pattern.content,
             category: pattern.category,
@@ -152,7 +142,7 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
             lastObserved: now,
           });
         } else {
-          await store.put(MEMORY_NAMESPACE, pattern.key, {
+          await store.put(PATTERNS_NAMESPACE, pattern.key, {
             content: pattern.content,
             category: pattern.category,
             observedCount: 1,

@@ -30,7 +30,7 @@ export interface MergeResult {
   merged: number;
 }
 
-function extractJson(text: string): string {
+export function extractJson(text: string): string {
   const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if (codeBlockMatch) return codeBlockMatch[1]!.trim();
   return text.trim();
@@ -99,7 +99,7 @@ export async function mergeDuplicatePatterns(
   ollama: OllamaAdapter,
   options: MergeOptions = {},
 ): Promise<MergeResult> {
-  const minCountToRun = options.minCountToRun ?? 15;
+  const minCountToRun = options.minCountToRun ?? 30;
 
   const items = await store.search(PATTERNS_NAMESPACE, { limit: 200 });
   if (items.length < minCountToRun) {

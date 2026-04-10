@@ -88,7 +88,7 @@ See `config.yml` for all available settings and their defaults.
 
 ## Pipeline
 
-The agent runs a 6-node LangGraph pipeline on each invocation:
+The agent runs a 7-node LangGraph pipeline on each invocation:
 
 1. **Capture** — grabs a webcam frame via ffmpeg
 2. **Summarize** — sends the image to Ollama for scene description
@@ -96,8 +96,9 @@ The agent runs a 6-node LangGraph pipeline on each invocation:
 4. **Action** — LLM selects an action from the allowed set
 5. **Message** — LLM drafts a notification message (if needed)
 6. **Persist** — writes JSONL log + sends Discord notification
+7. **ExtractMemories** — LLM distills the observation into long-term user patterns, then runs a duplicate-merge pass and caps the pattern store (LRU by `observedCount`)
 
-Actions: `none` | `log_only` | `nudge_break` | `nudge_sleep`
+Actions are data-driven via `config.yml`; see that file for the current set.
 
 All nodes degrade gracefully on failure (fail-closed to `log_only`).
 

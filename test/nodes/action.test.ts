@@ -11,14 +11,14 @@ const actionsConfig = mockActionsConfig();
 
 function mockFs(entries: unknown[] = []): FilesystemAdapter {
   return {
-    appendJsonLine: async () => {},
+    appendJsonLine: async () => { },
     readLastNLines: async () => entries,
   };
 }
 
 function errorFs(): FilesystemAdapter {
   return {
-    appendJsonLine: async () => {},
+    appendJsonLine: async () => { },
     readLastNLines: async () => { throw new Error("fs read error"); },
   };
 }
@@ -283,7 +283,7 @@ describe("action node with history", () => {
     let firstN = 0;
     let callCount = 0;
     const capturingFs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async (_dir, _date, n) => {
         callCount++;
         if (callCount === 1) firstN = n;
@@ -321,7 +321,7 @@ describe("action node with history", () => {
       ],
     };
     const dateFs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => dayDigests[date] ?? [],
     };
     const node = createActionNode({
@@ -450,7 +450,7 @@ describe("action node with memory store", () => {
     await node(makeState());
 
     expect(capturedPrompt).not.toContain("Known user patterns");
-    expect(capturedPrompt).toContain("wellness assistant");
+    expect(capturedPrompt).toContain("personal assistant");
   });
 
   test("works with empty store", async () => {
