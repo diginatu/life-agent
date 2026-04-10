@@ -60,8 +60,8 @@ function formatTime(date: Date): string {
 
 interface LogEntry {
   timestamp?: string;
-  summary?: { activityGuess?: string | null; posture?: string; [key: string]: unknown };
-  decision?: { action?: string; reason?: string; [key: string]: unknown };
+  summary?: { activityGuess?: string | null; posture?: string;[key: string]: unknown };
+  decision?: { action?: string; reason?: string;[key: string]: unknown };
   feedbackFromPrevious?: { text: string; userId: string; timestamp: string }[];
   tags?: string[];
   content?: string;
@@ -92,7 +92,7 @@ function formatHistory(entries: LogEntry[], digestInfos?: DigestInfo[]): { histo
   }
 
   const historyLines = regularEntries.map((e) => {
-    const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "??:??";
+    const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "??:??";
     const activity = e.summary?.activityGuess ?? "unknown";
     const posture = e.summary?.posture ?? "unknown";
     const action = e.decision?.action ?? "unknown";
@@ -139,7 +139,7 @@ function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: 
       memories.map((m) => `- ${m.content} (${m.category}, observed ${m.observedCount} times)`).join("\n") + "\n";
   }
 
-  return `You are a personal wellness assistant. Based on the scene analysis, user patterns, and history, select the most appropriate action.
+  return `You are a personal assistant. Based on the scene analysis, user patterns, and history, select the most appropriate action.
 
 Scene analysis:
 - Person present: ${summary.personPresent}

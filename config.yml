@@ -5,7 +5,7 @@ settings:
   webcamDevice: /dev/video0
 
   # Ollama configuration
-  ollamaModel: gemma3:12b
+  ollamaModel: gemma4:e2b
   ollamaBaseUrl: http://localhost:11434
 
   # Output directories

@@ -31,7 +31,7 @@ function extractJson(text: string): string {
 
 function buildPrompt(summary: SceneSummary, decision: ActionSelection, actionDescription?: string): string {
   const descLine = actionDescription ? `\n- Action description: ${actionDescription}` : "";
-  return `You are a friendly personal wellness assistant. Draft a short notification message for the user.
+  return `You are a friendly personal assistant. Draft a short notification message for the user.
 
 Context:
 - Action: ${decision.action}${descLine}
@@ -40,7 +40,7 @@ Context:
 - Activity: ${summary.activityGuess ?? "unknown"}
 - Posture: ${summary.posture}
 
-Write a warm, concise notification. Return a JSON object with exactly these fields:
+Write a concise notification. Return a JSON object with exactly these fields:
 {
   "title": string (short, under 50 chars),
   "body": string (1-2 sentences, friendly tone)
