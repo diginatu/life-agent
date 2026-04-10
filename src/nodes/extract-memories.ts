@@ -4,10 +4,12 @@ import type { ActionSelection } from "../schemas/action.ts";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/seed-actions.ts";
 import { mergeDuplicatePatterns } from "../store/merge-patterns.ts";
+import { capUserPatterns } from "../store/cap-patterns.ts";
 
 interface ExtractMemoriesNodeDeps {
   ollama: OllamaAdapter;
   mergeThreshold?: number;
+  maxPatterns?: number;
 }
 
 interface ExtractMemoriesNodeState {
@@ -161,6 +163,7 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
       }
 
       await mergeDuplicatePatterns(store, deps.ollama, { minCountToRun: deps.mergeThreshold });
+      await capUserPatterns(store, { maxPatterns: deps.maxPatterns });
 
       for (const update of actionUpdates) {
         if (!update.key || !update.description) continue;
