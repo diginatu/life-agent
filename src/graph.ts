@@ -87,7 +87,13 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     actionsConfig: config,
     discord,
   });
-  const extractMemoriesNode = createExtractMemoriesNode({ ollama });
+  const extractMemoriesNode = createExtractMemoriesNode({
+    ollama,
+    fs,
+    logDir: s.logDir,
+    historyCount: s.actionHistoryCount,
+    now: deps.now,
+  });
 
   const store = deps.store ?? await FileStore.create({ dir: s.memoryDir });
   await seedActionDefinitions(store, config);

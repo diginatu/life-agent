@@ -206,4 +206,24 @@ describe("message node with action definitions in store", () => {
 
     expect(capturedPrompt).toContain("Suggest the user take a short break");
   });
+
+  test("includes user feedback replies in LLM prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        capturedPrompt = prompt;
+        return validMessageJson;
+      },
+      generateWithImage: async () => validMessageJson,
+    };
+    const node = createMessageNode({ ollama: capturingOllama, actionsConfig });
+    await node(makeState("nudge_break", {
+      userFeedback: [
+        { text: "stop nagging me about water", userId: "u1", timestamp: "2026-04-12T10:15:00.000Z" },
+      ],
+    }));
+
+    expect(capturedPrompt).toContain("stop nagging me about water");
+    expect(capturedPrompt).toMatch(/user reply/i);
+  });
 });

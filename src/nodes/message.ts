@@ -5,6 +5,7 @@ import type { ActionSelection } from "../schemas/action.ts";
 import type { Config } from "../config.ts";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/seed-actions.ts";
+import { formatUserFeedback, type UserFeedbackEntry } from "./history-format.ts";
 
 interface MessageNodeDeps {
   ollama: OllamaAdapter;
@@ -14,6 +15,7 @@ interface MessageNodeDeps {
 interface MessageNodeState {
   summary?: SceneSummary;
   decision?: ActionSelection;
+  userFeedback?: UserFeedbackEntry[];
 }
 
 interface MessageNodeResult {
@@ -29,13 +31,14 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-function buildPrompt(summary: SceneSummary, decision: ActionSelection, responseStyle: string, actionDescription?: string): string {
+function buildPrompt(summary: SceneSummary, decision: ActionSelection, responseStyle: string, actionDescription?: string, userFeedback?: UserFeedbackEntry[]): string {
   const descLine = actionDescription ? `\n- Action description: ${actionDescription}` : "";
+  const feedbackSection = formatUserFeedback(userFeedback);
   return `Follow this response style: ${responseStyle}.
 
 You are a personal assistant. Draft a mention post for the user.
 This message will be posted in a Discord channel and will mention the user. Do no include the mention in the body.
-Feel free to include any context.
+Feel free to include any context. If the user recently replied, acknowledge it or adjust your tone accordingly.
 
 Context:
 - Action: ${decision.action}${descLine}
@@ -43,7 +46,7 @@ Context:
 - Scene: ${summary.scene}
 - Activity: ${summary.activityGuess ?? "unknown"}
 - Posture: ${summary.posture}
-
+${feedbackSection}
 Return a JSON object with exactly this field:
 {
   "body": string (the message content; may be multiple sentences)
@@ -93,6 +96,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       state.decision,
       actionsConfig.settings.responseStyle,
       actionDescription,
+      state.userFeedback,
     );
 
     let rawResponse: string;

@@ -7,6 +7,13 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { collectPreviousDigests } from "../digest/cli.ts";
 import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/seed-actions.ts";
 import { formatTime } from "./format-time.ts";
+import {
+  formatHistory,
+  formatUserFeedback,
+  type DigestInfo,
+  type LogEntry,
+  type UserFeedbackEntry,
+} from "./history-format.ts";
 
 interface MemoryInfo {
   key: string;
@@ -23,12 +30,6 @@ interface ActionNodeDeps {
   historyCount?: number;
   digestDays?: number;
   now?: () => Date;
-}
-
-interface UserFeedbackEntry {
-  text: string;
-  userId: string;
-  timestamp: string;
 }
 
 interface ActionNodeState {
@@ -55,69 +56,6 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-interface LogEntry {
-  timestamp?: string;
-  summary?: { activityGuess?: string | null; posture?: string;[key: string]: unknown };
-  decision?: { action?: string; reason?: string;[key: string]: unknown };
-  feedbackFromPrevious?: { text: string; userId: string; timestamp: string }[];
-  tags?: string[];
-  content?: string;
-  [key: string]: unknown;
-}
-
-interface DigestInfo {
-  date: string;
-  content: string;
-}
-
-function formatHistory(entries: LogEntry[], digestInfos?: DigestInfo[]): { history: string; digests: DigestInfo[] } {
-  const regularEntries: LogEntry[] = [];
-  const digests: DigestInfo[] = [];
-
-  for (const entry of entries) {
-    if (entry.tags?.includes("digest")) {
-      if (entry.content && entry.digestDate) {
-        digests.push({ date: entry.digestDate as string, content: entry.content });
-      }
-    } else {
-      regularEntries.push(entry);
-    }
-  }
-
-  if (digestInfos) {
-    digests.push(...digestInfos);
-  }
-
-  const historyLines = regularEntries.map((e) => {
-    const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "??:??";
-    const activity = e.summary?.activityGuess ?? "unknown";
-    const posture = e.summary?.posture ?? "unknown";
-    const action = e.decision?.action ?? "unknown";
-    const reason = e.decision?.reason ?? "";
-    let line = `  ${time} | ${posture}, ${activity} → ${action}${reason ? ` (${reason})` : ""}`;
-    if (e.feedbackFromPrevious && e.feedbackFromPrevious.length > 0) {
-      const replies = e.feedbackFromPrevious.map((f) => f.text).join("; ");
-      line += `\n    user reply: ${replies}`;
-    }
-    return line;
-  });
-
-  return {
-    history: historyLines.length > 0 ? historyLines.join("\n") : "",
-    digests,
-  };
-}
-
-function formatUserFeedback(feedback: UserFeedbackEntry[]): string {
-  const lines = feedback.map((f) => {
-    const time = f.timestamp
-      ? new Date(f.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
-      : "??:??";
-    return `  - [${time}] ${f.text}`;
-  });
-  return `\nLatest user reply (since last nudge):\n${lines.join("\n")}\n`;
-}
-
 function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[], memories?: MemoryInfo[], actionDefs?: Map<string, string>, userFeedback?: UserFeedbackEntry[]): string {
   const allActions = actionsConfig.getActionNames();
   const actionDescriptions = allActions
@@ -136,9 +74,7 @@ function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: 
       historySections += `\n[${d.date}]\n${d.content}\n`;
     }
   }
-  if (userFeedback && userFeedback.length > 0) {
-    historySections += formatUserFeedback(userFeedback);
-  }
+  historySections += formatUserFeedback(userFeedback);
   if (history) {
     historySections += `\nRecent history:\n${history}\n`;
   }

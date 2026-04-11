@@ -294,6 +294,98 @@ describe("extract_memories action definition evolution", () => {
     expect(capturedPrompt).toContain("Suggest the user take a short break");
   });
 
+  test("includes user feedback from state in LLM prompt", async () => {
+    const store = new InMemoryStore();
+    let capturedPrompt = "";
+    const ollama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        capturedPrompt = prompt;
+        return "[]";
+      },
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(
+      makeState({
+        userFeedback: [
+          { text: "stop nagging me about water", userId: "u1", timestamp: "2026-04-12T10:15:00.000Z" },
+        ],
+      }),
+      makeConfig(store),
+    );
+
+    expect(capturedPrompt).toContain("stop nagging me about water");
+    expect(capturedPrompt).toMatch(/user reply/i);
+  });
+
+  test("includes recent log history in LLM prompt when fs and logDir provided", async () => {
+    const store = new InMemoryStore();
+    let capturedPrompt = "";
+    const ollama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        capturedPrompt = prompt;
+        return "[]";
+      },
+      generateWithImage: async () => "",
+    };
+
+    const fs = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => [
+        {
+          timestamp: "2026-04-12T09:30:00.000Z",
+          summary: { posture: "sitting", activityGuess: "coding" },
+          decision: { action: "nudge_break", reason: "2h since last break" },
+        },
+        {
+          timestamp: "2026-04-12T09:45:00.000Z",
+          summary: { posture: "standing", activityGuess: "stretching" },
+          decision: { action: "none", reason: "good activity" },
+          feedbackFromPrevious: [
+            { text: "thanks for the reminder", userId: "u1", timestamp: "2026-04-12T09:40:00.000Z" },
+          ],
+        },
+      ],
+    };
+
+    const node = createExtractMemoriesNode({
+      ollama,
+      fs,
+      logDir: "/fake/logs",
+      historyCount: 10,
+    });
+    await node(makeState(), makeConfig(store));
+
+    expect(capturedPrompt).toMatch(/Recent History/i);
+    expect(capturedPrompt).toContain("coding");
+    expect(capturedPrompt).toContain("nudge_break");
+    expect(capturedPrompt).toContain("stretching");
+    expect(capturedPrompt).toContain("thanks for the reminder");
+  });
+
+  test("continues without error when readLastNLines throws", async () => {
+    const store = new InMemoryStore();
+    const ollama: OllamaAdapter = {
+      generate: async () => "[]",
+      generateWithImage: async () => "",
+    };
+
+    const fs = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => { throw new Error("disk gone"); },
+    };
+
+    const node = createExtractMemoriesNode({
+      ollama,
+      fs,
+      logDir: "/fake/logs",
+    });
+    const result = await node(makeState(), makeConfig(store));
+
+    expect(result.errors).toBeUndefined();
+  });
+
   test("processes both patterns and actionUpdates in same response", async () => {
     const store = new InMemoryStore();
     await store.put(["actions", "definitions"], "nudge_sleep", {

@@ -1,4 +1,5 @@
 import type { OllamaAdapter } from "../adapters/ollama.ts";
+import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { ActionSelection } from "../schemas/action.ts";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
@@ -6,16 +7,27 @@ import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/see
 import { mergeDuplicatePatterns, extractJson, PATTERNS_NAMESPACE } from "../store/merge-patterns.ts";
 import { capUserPatterns } from "../store/cap-patterns.ts";
 import { formatTime } from "./format-time.ts";
+import {
+  formatHistory,
+  formatUserFeedback,
+  type LogEntry,
+  type UserFeedbackEntry,
+} from "./history-format.ts";
 
 interface ExtractMemoriesNodeDeps {
   ollama: OllamaAdapter;
   mergeThreshold?: number;
   maxPatterns?: number;
+  fs?: FilesystemAdapter;
+  logDir?: string;
+  historyCount?: number;
+  now?: () => Date;
 }
 
 interface ExtractMemoriesNodeState {
   summary?: SceneSummary;
   decision?: ActionSelection;
+  userFeedback?: UserFeedbackEntry[];
 }
 
 interface ExtractMemoriesNodeResult {
@@ -33,6 +45,9 @@ function buildExtractionPrompt(
   decision: ActionSelection | undefined,
   existingMemories: Array<{ key: string; value: Record<string, unknown> }>,
   actionDefinitions: Array<{ key: string; value: Record<string, unknown> }>,
+  currentTime: Date,
+  logEntries?: LogEntry[],
+  userFeedback?: UserFeedbackEntry[],
 ): string {
   const memorySection = existingMemories.length > 0
     ? `## Existing Known Patterns\n${existingMemories.map((m) =>
@@ -52,25 +67,30 @@ function buildExtractionPrompt(
     `Scene: ${summary.scene}`,
     `Activity: ${summary.activityGuess ?? "unknown"}`,
     `Confidence: ${summary.confidence}`,
-    `Time: ${formatTime(new Date())}`,
+    `Time: ${formatTime(currentTime)}`,
     decision ? `Action taken: ${decision.action} (${decision.reason})` : null,
   ].filter(Boolean).join("\n");
 
-  return `You are a behavioral pattern analyzer. Given a current observation and existing known patterns, identify any new behavioral patterns or confirm existing ones. You may also suggest refinements to action definitions based on observed feedback.
+  const { history } = logEntries ? formatHistory(logEntries) : { history: "" };
+  const historySection = history ? `\n## Recent History\n${history}\n` : "";
+  const feedbackSection = formatUserFeedback(userFeedback);
+
+  return `You are a behavioral pattern analyzer. Given a current observation, recent history, user feedback, and existing known patterns, identify any new behavioral patterns or confirm existing ones. You may also suggest refinements to action definitions based on observed feedback.
 
 ${memorySection}
 ${actionDefsSection ? `\n${actionDefsSection}\n` : ""}
 ## Current Observation
 ${observation}
-
+${historySection}${feedbackSection}
 ## Instructions
 - Look for recurring behavioral patterns (sleep schedule, routines, habits, work patterns, wellness behaviors)
+- Use recent history to spot repetition across ticks and user replies to learn preferences
 - If you see evidence of an EXISTING pattern (same key), include it to confirm the observation
 - If you notice something NEW and noteworthy, add it with a descriptive key
 - Use kebab-case keys (e.g., "sleep-late", "takes-bath-before-bed", "codes-at-night")
 - Categories: "sleep", "activity", "routine", "preference", "wellness"
 - Only include patterns you are reasonably confident about
-- If user feedback suggests an action definition should be refined, include an actionUpdate
+- If user feedback (latest reply or prior replies in history) suggests an action definition should be refined, include an actionUpdate
 
 Return a JSON object (no markdown wrapping):
 {
@@ -106,10 +126,21 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
       return {};
     }
 
+    const now = deps.now ?? (() => new Date());
+    const currentTime = now();
+
+    const logEntriesPromise: Promise<LogEntry[] | undefined> = deps.fs && deps.logDir
+      ? deps.fs
+          .readLastNLines(deps.logDir, currentTime.toISOString().slice(0, 10), deps.historyCount ?? 10)
+          .then((entries) => entries as LogEntry[])
+          .catch(() => undefined)
+      : Promise.resolve(undefined);
+
     try {
-      const [existingItems, actionDefItems] = await Promise.all([
+      const [existingItems, actionDefItems, logEntries] = await Promise.all([
         store.search(PATTERNS_NAMESPACE, { limit: 50 }),
         store.search(ACTION_DEFS_NAMESPACE, { limit: 50 }),
+        logEntriesPromise,
       ]);
 
       const existingMemories = existingItems.map((item) => ({
@@ -122,7 +153,15 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
         value: item.value,
       }));
 
-      const prompt = buildExtractionPrompt(state.summary, state.decision, existingMemories, actionDefinitions);
+      const prompt = buildExtractionPrompt(
+        state.summary,
+        state.decision,
+        existingMemories,
+        actionDefinitions,
+        currentTime,
+        logEntries,
+        state.userFeedback,
+      );
       const response = await deps.ollama.generate(prompt);
       const jsonStr = extractJson(response);
       const { patterns, actionUpdates } = parseLlmResponse(jsonStr);
