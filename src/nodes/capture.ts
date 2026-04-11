@@ -6,6 +6,7 @@ interface CaptureConfig {
   captureDir: string;
   captureWidth: number;
   captureHeight: number;
+  captureRetentionCount: number;
 }
 
 interface CaptureNodeDeps {
@@ -36,6 +37,24 @@ export function createCaptureNode(deps: CaptureNodeDeps) {
       const errorMsg = `ffmpeg capture failed: ${result.stderr}`;
       console.error(errorMsg);
       return { errors: [errorMsg] };
+    }
+
+    try {
+      const entries = await ffmpeg.listCaptures(config.captureDir);
+      const sorted = [...entries].sort();
+      const excess = sorted.length - config.captureRetentionCount;
+      if (excess > 0) {
+        const victims = sorted.slice(0, excess);
+        for (const name of victims) {
+          try {
+            await ffmpeg.deleteCapture(`${config.captureDir}/${name}`);
+          } catch (err) {
+            console.error(`capture prune: failed to delete ${name}: ${err}`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`capture prune: list failed: ${err}`);
     }
 
     return {

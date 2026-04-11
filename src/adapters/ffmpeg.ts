@@ -5,6 +5,8 @@ export interface FfmpegAdapter {
     width: number,
     height: number,
   ): Promise<{ success: boolean; stderr: string }>;
+  listCaptures(dir: string): Promise<string[]>;
+  deleteCapture(path: string): Promise<void>;
 }
 
 export type SpawnFn = typeof Bun.spawn;
@@ -35,6 +37,21 @@ export function createFfmpegAdapter(spawn: SpawnFn = Bun.spawn): FfmpegAdapter {
         success: exitCode === 0,
         stderr: stderrText,
       };
+    },
+
+    async listCaptures(dir) {
+      const { readdir } = await import("node:fs/promises");
+      try {
+        const entries = await readdir(dir);
+        return entries.filter((n) => n.startsWith("capture-") && n.endsWith(".jpg"));
+      } catch {
+        return [];
+      }
+    },
+
+    async deleteCapture(path) {
+      const { unlink } = await import("node:fs/promises");
+      await unlink(path);
     },
   };
 }

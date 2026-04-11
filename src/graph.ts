@@ -57,6 +57,7 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
       captureDir: s.captureDir,
       captureWidth: s.captureWidth,
       captureHeight: s.captureHeight,
+      captureRetentionCount: s.captureRetentionCount,
     },
   });
 

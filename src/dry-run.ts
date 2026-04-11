@@ -33,6 +33,10 @@ export function createDryRunDeps() {
       console.log(`[dry-run] Would capture frame to ${outputPath}`);
       return { success: true, stderr: "" };
     },
+    listCaptures: async () => [],
+    deleteCapture: async (path) => {
+      console.log(`[dry-run] Would delete capture ${path}`);
+    },
   };
 
   const ollama: OllamaAdapter = {

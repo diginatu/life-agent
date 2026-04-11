@@ -9,6 +9,7 @@ const SettingsSchema = z.object({
   captureDir: z.string().default("./captures"),
   captureWidth: z.number().int().positive().default(640),
   captureHeight: z.number().int().positive().default(480),
+  captureRetentionCount: z.number().int().positive().default(10),
   actionHistoryCount: z.number().int().nonnegative().default(10),
   actionDigestDays: z.number().int().nonnegative().default(1),
   digestContextDays: z.number().int().nonnegative().default(3),

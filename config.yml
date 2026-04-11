@@ -16,6 +16,9 @@ settings:
   captureWidth: 640
   captureHeight: 480
 
+  # Maximum number of capture images to keep on disk (oldest pruned after each capture)
+  captureRetentionCount: 10
+
   # Number of recent log entries passed to the action LLM for context
   actionHistoryCount: 10
 

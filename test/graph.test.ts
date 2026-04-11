@@ -8,6 +8,8 @@ import { mockActionsConfig } from "./helpers/mock-config.ts";
 function mockFfmpeg(success: boolean, stderr = ""): FfmpegAdapter {
   return {
     captureFrame: async () => ({ success, stderr }),
+    listCaptures: async () => [],
+    deleteCapture: async () => {},
   };
 }
 
