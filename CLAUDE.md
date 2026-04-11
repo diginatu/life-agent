@@ -18,6 +18,34 @@ Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore fo
 
 Default to using Bun instead of Node.js.
 
+## Local installation & runtime
+
+Installed as a systemd user service via `./install.sh`, which:
+- Renders `systemd/life-agent.service.template` (substituting `{{PROJECT_DIR}}` and `{{BUN_PATH}}`) into `~/.config/systemd/user/life-agent.service`
+- Copies `systemd/life-agent.timer.template` to the same dir
+- Creates `config.local.yml` from `config.yml` if missing (machine-local override)
+- Enables `life-agent.timer`
+
+Service is `Type=oneshot`, `WorkingDirectory={repo}`, runs `bun run src/index.ts --config {repo}/config.local.yml`. Timer fires `OnCalendar=*:0/15` with `Persistent=true` (catches missed runs after sleep) and `RandomizedDelaySec=30`. `After=ollama.service` — depends on the local Ollama service being up.
+
+Runtime paths (defaults in `src/config.ts`, relative to repo root which is the systemd WorkingDirectory):
+- `./logs/` — JSONL action logs
+- `./captures/` — webcam frame snapshots
+- `./memory/store.json` — long-term pattern store (FileStore)
+- Web dashboard: `http://localhost:3000` (`bun run src/web/entry.ts`)
+
+Operating a running install:
+- Logs: `journalctl --user -u life-agent -f` (or `-e` to jump to end, `-n 200` for last N)
+- Status / next scheduled run: `systemctl --user status life-agent.service`, `systemctl --user list-timers life-agent.timer`
+- Trigger a one-off tick: `systemctl --user start life-agent.service`
+- Reinstall after editing templates: re-run `./install.sh`; uninstall via `./uninstall.sh`
+
+Gotchas:
+- Manual `bun run src/index.ts` uses `config.yml`, **not** `config.local.yml` — pass `--config config.local.yml` to match systemd behavior.
+- The systemd unit has `ProtectSystem=strict`. Writable paths are limited to `logs/`, `captures/`, and `memory/` via `ReadWritePaths`. If you add a new on-disk output directory, add it here too and re-run `./install.sh`.
+- The unit template does **not** load any `EnvironmentFile`. If a future feature needs env vars (Discord token, API keys), the unit must be updated, not just `.env` set in the user shell.
+- Use `bun run src/index.ts --dry-run` to exercise the pipeline without webcam/Ollama/Discord.
+
 ## APIs
 
 - `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.

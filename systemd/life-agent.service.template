@@ -16,7 +16,7 @@ SyslogIdentifier=life-agent
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths={{PROJECT_DIR}}/logs {{PROJECT_DIR}}/captures
+ReadWritePaths={{PROJECT_DIR}}/logs {{PROJECT_DIR}}/captures {{PROJECT_DIR}}/memory
 PrivateTmp=true
 
 [Install]
