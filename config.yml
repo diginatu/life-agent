@@ -31,6 +31,13 @@ settings:
   # Discord channel ID (set to enable Discord notifications)
   discordChannelId: ""
 
+  # Discord user ID to mention in notifications (e.g. "123456789012345678")
+  # Leave empty to disable mentions. Find your ID: Discord > Settings > Advanced > Developer Mode, then right-click your name.
+  discordMentionUserId: ""
+
+  # Discord channel ID for daily digest (leave empty to use discordChannelId)
+  discordDigestChannelId: ""
+
   # Response style applied to LLM-generated user-visible text (notifications, digest).
   # Free-form: combine language and tone, e.g. "日本語、丁寧で優しい口調" or "French, playful and encouraging".
   responseStyle: English, friendly and concise

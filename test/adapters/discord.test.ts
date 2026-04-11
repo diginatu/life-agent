@@ -50,6 +50,29 @@ describe("DiscordAdapter", () => {
       expect(opts.embeds[0].title).toBe("Test Title");
       expect(opts.embeds[0].description).toBe("Test Body");
     });
+
+    test("sends mention as content when mentionUserId is provided", async () => {
+      let capturedOptions: unknown = null;
+      const channel = makeChannel({
+        send: async (options: unknown) => { capturedOptions = options; return { id: "456" }; },
+      });
+      const adapter = createDiscordAdapterFromChannel(channel, makeClient());
+      await adapter.sendEmbed("Title", "Body", "user123");
+      const opts = capturedOptions as { content: string; embeds: unknown[] };
+      expect(opts.content).toBe("<@user123>");
+      expect(opts.embeds).toHaveLength(1);
+    });
+
+    test("does not include content when mentionUserId is omitted", async () => {
+      let capturedOptions: unknown = null;
+      const channel = makeChannel({
+        send: async (options: unknown) => { capturedOptions = options; return { id: "789" }; },
+      });
+      const adapter = createDiscordAdapterFromChannel(channel, makeClient());
+      await adapter.sendEmbed("Title", "Body");
+      const opts = capturedOptions as Record<string, unknown>;
+      expect(opts.content).toBeUndefined();
+    });
   });
 
   describe("collectReplies", () => {

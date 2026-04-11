@@ -12,7 +12,7 @@ export interface DiscordClient {
 }
 
 export interface DiscordAdapter {
-  sendEmbed(title: string, body: string): Promise<string>;
+  sendEmbed(title: string, body: string, mentionUserId?: string): Promise<string>;
   collectReplies(afterMessageId: string): Promise<{ text: string; userId: string; timestamp: string }[]>;
   getLatestMessageId(): Promise<string | null>;
   destroy(): Promise<void>;
@@ -20,8 +20,10 @@ export interface DiscordAdapter {
 
 export function createDiscordAdapterFromChannel(channel: DiscordChannel, client: DiscordClient): DiscordAdapter {
   return {
-    async sendEmbed(title: string, body: string): Promise<string> {
-      const message = await channel.send({ embeds: [{ title, description: body }] });
+    async sendEmbed(title: string, body: string, mentionUserId?: string): Promise<string> {
+      const opts: Record<string, unknown> = { embeds: [{ title, description: body }] };
+      if (mentionUserId) opts.content = `<@${mentionUserId}>`;
+      const message = await channel.send(opts);
       return message.id;
     },
 

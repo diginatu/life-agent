@@ -56,7 +56,11 @@ export function createPersistNode(deps: PersistNodeDeps) {
     let discordMessageId: string | null = null;
     if (discord && state.decision && actionsConfig.isActiveAction(state.decision.action) && state.message) {
       try {
-        discordMessageId = await discord.sendEmbed(state.message.title, state.message.body);
+        discordMessageId = await discord.sendEmbed(
+          state.message.title,
+          state.message.body,
+          actionsConfig.settings.discordMentionUserId || undefined,
+        );
       } catch (err) {
         console.error(`persist: discord send error: ${err instanceof Error ? err.message : String(err)}`);
       }
