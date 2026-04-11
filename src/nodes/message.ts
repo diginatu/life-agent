@@ -33,11 +33,9 @@ function buildPrompt(summary: SceneSummary, decision: ActionSelection, responseS
   const descLine = actionDescription ? `\n- Action description: ${actionDescription}` : "";
   return `Follow this response style: ${responseStyle}.
 
-You are a friendly personal assistant. Draft a Discord mention post for the user.
-This message will be posted in a Discord channel and will @mention the user.
-It is not a desktop notification, so you are not restricted to short text —
-feel free to include the reason or context naturally so the user understands
-why you're nudging them. Avoid hard length caps, but stay on topic.
+You are a personal assistant. Draft a mention post for the user.
+This message will be posted in a Discord channel and will mention the user. Do no include the mention in the body.
+Feel free to include any context.
 
 Context:
 - Action: ${decision.action}${descLine}
@@ -48,7 +46,7 @@ Context:
 
 Return a JSON object with exactly this field:
 {
-  "body": string (the message content; may be multiple sentences and include reasons)
+  "body": string (the message content; may be multiple sentences)
 }
 
 Return ONLY the JSON object, no other text.`;

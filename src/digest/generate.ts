@@ -99,7 +99,7 @@ function formatStatsMarkdown(date: string, stats: DayStats): string {
   return lines.join("\n");
 }
 
-function buildDigestPrompt(date: string, stats: DayStats, entries: LogEntry[], responseStyle: string, previousDigests?: Array<{ date: string; content: string }>): string {
+function buildDigestPrompt(date: string, stats: DayStats, entries: LogEntry[], previousDigests?: Array<{ date: string; content: string }>): string {
   const statsSummary = formatStatsMarkdown(date, stats);
   const sampleSize = Math.min(entries.length, 20);
   const sampled = entries.slice(0, sampleSize).map((e) => ({
@@ -120,9 +120,7 @@ function buildDigestPrompt(date: string, stats: DayStats, entries: LogEntry[], r
 
   const hasPreviousContext = previousDigests && previousDigests.length > 0;
 
-  return `Follow this response style: ${responseStyle}.
-
-You are a personal wellness analyst. Write a concise daily digest in markdown based on the data below.
+  return `You are a personal asistant. Write a concise daily digest in markdown based on the data below for your work in the future.
 ${previousDigestSection}
 ## Today's Data — ${date}
 
@@ -133,14 +131,14 @@ ${statsSummary}
 ${JSON.stringify(sampled, null, 2)}
 
 ${hasPreviousContext
-    ? `Write a brief 1-3 paragraph summary. Focus ONLY on:
+      ? `Write a brief 1-3 paragraph summary. Focus ONLY on:
 1. What is new or different today compared to recent days
 2. Notable changes in patterns, activities, or wellness
 3. Any concerning trends or positive improvements
 
 If today was similar to recent days, keep it very short (1 paragraph).
 Do NOT repeat patterns already described in recent digests.`
-    : `Write a friendly 3-5 paragraph summary covering:
+      : `Write a 3-5 paragraph summary covering:
 1. Overall patterns (how the day went)
 2. Activity breakdown and any notable transitions
 3. Wellness observations (breaks taken, posture, etc.)`}
@@ -153,12 +151,11 @@ export async function generateDigest(
   date: string,
   ollama: OllamaAdapter,
   previousDigests?: Array<{ date: string; content: string }>,
-  responseStyle: string = "English, friendly and concise",
 ): Promise<string> {
   if (entries.length === 0) {
     try {
       return await ollama.generate(
-        `Follow this response style: ${responseStyle}.\n\nWrite a very short markdown note saying no activity was recorded for ${date}. Start with "## No activity".`,
+        `Write a very short markdown note saying no activity was recorded for ${date}. Start with "## No activity".`,
       );
     } catch {
       return `# Daily Digest — ${date}\n\nNo activity recorded for this day.`;
@@ -166,7 +163,7 @@ export async function generateDigest(
   }
 
   const stats = buildStats(entries);
-  const prompt = buildDigestPrompt(date, stats, entries, responseStyle, previousDigests);
+  const prompt = buildDigestPrompt(date, stats, entries, previousDigests);
 
   try {
     return await ollama.generate(prompt);

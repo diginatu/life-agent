@@ -154,7 +154,7 @@ describe("runDigest with Discord", () => {
 
   function mockFs(): FilesystemAdapter {
     return {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async () => sampleEntries,
     };
   }
@@ -169,7 +169,7 @@ describe("runDigest with Discord", () => {
         return "discord-msg-1";
       },
       collectReplies: async () => [],
-      destroy: async () => {},
+      destroy: async () => { },
       getLatestMessageId: async () => null,
     };
   }
@@ -217,7 +217,7 @@ describe("shouldRunDigest", () => {
 
   test("returns true when no digest marker in log", async () => {
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async () => [
         { timestamp: "2026-03-31T09:00:00.000Z", tags: [], decision: { action: "none" } },
       ],
@@ -227,7 +227,7 @@ describe("shouldRunDigest", () => {
 
   test("returns false when digest marker exists within 24h", async () => {
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async () => [
         { timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30" },
       ],
@@ -237,7 +237,7 @@ describe("shouldRunDigest", () => {
 
   test("returns true when digest marker is older than 24h", async () => {
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async () => [
         { timestamp: "2026-03-30T09:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29" },
       ],
@@ -247,7 +247,7 @@ describe("shouldRunDigest", () => {
 
   test("returns true when log is empty", async () => {
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async () => [],
     };
     expect(await shouldRunDigest(fs, "./logs", now)).toBe(true);
@@ -315,7 +315,7 @@ describe("runDigest persists digest content", () => {
 describe("collectPreviousDigests", () => {
   test("returns empty array when no digest entries exist", async () => {
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async () => sampleEntries,
     };
     const result = await collectPreviousDigests(fs, "./logs", "2026-03-31", 3);
@@ -324,7 +324,7 @@ describe("collectPreviousDigests", () => {
 
   test("finds digests from previous days' log files", async () => {
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => {
         if (date === "2026-03-31") {
           return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }];
@@ -343,7 +343,7 @@ describe("collectPreviousDigests", () => {
 
   test("excludes digests for the target date itself", async () => {
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => {
         if (date === "2026-03-31") {
           return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-31", content: "## March 31 digest" }];
@@ -357,7 +357,7 @@ describe("collectPreviousDigests", () => {
 
   test("deduplicates by digestDate", async () => {
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => {
         if (date === "2026-03-31") {
           return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29 digest (copy 1)" }];
@@ -375,7 +375,7 @@ describe("collectPreviousDigests", () => {
 
   test("respects days parameter", async () => {
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => {
         const digestsByDate: Record<string, unknown[]> = {
           "2026-03-31": [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }],
@@ -396,7 +396,7 @@ describe("collectPreviousDigests", () => {
 
   test("handles read errors gracefully", async () => {
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => {
         if (date === "2026-03-31") {
           return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }];
@@ -446,20 +446,6 @@ describe("generateDigest with previous digests", () => {
     expect(hasNewOrDifferent).toBe(true);
   });
 
-  test("injects responseStyle into prompt", async () => {
-    let capturedPrompt = "";
-    const capturingOllama: OllamaAdapter = {
-      generate: async (prompt) => {
-        capturedPrompt = prompt;
-        return "## Summary";
-      },
-      generateWithImage: async () => "",
-    };
-    await generateDigest(sampleEntries, "2026-03-29", capturingOllama, undefined, "French, playful");
-
-    expect(capturedPrompt).toContain("French, playful");
-  });
-
   test("works without previous digests (backward compatible)", async () => {
     const mockOllama: OllamaAdapter = {
       generate: async () => "## Summary",
@@ -478,7 +464,7 @@ describe("runDigest collects previous digests", () => {
     let capturedPrompt = "";
 
     const fs: FilesystemAdapter = {
-      appendJsonLine: async () => {},
+      appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => {
         datesRead.push(date as string);
         if (date === "2026-03-29") {

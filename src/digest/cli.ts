@@ -63,7 +63,6 @@ export async function runDigest(config: Config, date: string, deps: DigestDeps =
     date,
     ollama,
     previousDigests,
-    config.settings.responseStyle,
   );
 
   console.log(markdown);
