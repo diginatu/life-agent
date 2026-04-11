@@ -5,6 +5,7 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/seed-actions.ts";
 import { mergeDuplicatePatterns, extractJson, PATTERNS_NAMESPACE } from "../store/merge-patterns.ts";
 import { capUserPatterns } from "../store/cap-patterns.ts";
+import { formatTime } from "./format-time.ts";
 
 interface ExtractMemoriesNodeDeps {
   ollama: OllamaAdapter;
@@ -51,7 +52,7 @@ function buildExtractionPrompt(
     `Scene: ${summary.scene}`,
     `Activity: ${summary.activityGuess ?? "unknown"}`,
     `Confidence: ${summary.confidence}`,
-    `Time: ${new Date().toISOString()}`,
+    `Time: ${formatTime(new Date())}`,
     decision ? `Action taken: ${decision.action} (${decision.reason})` : null,
   ].filter(Boolean).join("\n");
 

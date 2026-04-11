@@ -154,7 +154,7 @@ describe("action node", () => {
     });
     await node(makeState());
 
-    expect(capturedPrompt).toContain("23:45");
+    expect(capturedPrompt).toContain("11:45 PM");
     expect(capturedPrompt).toContain("Tuesday");
   });
 

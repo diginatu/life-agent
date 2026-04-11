@@ -50,6 +50,23 @@ describe("extract_memories node", () => {
     expect(items[0].value.observedCount).toBe(1);
   });
 
+  test("prompt renders Time in local 12-hour format", async () => {
+    const store = new InMemoryStore();
+    let capturedPrompt = "";
+    const ollama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return JSON.stringify({ patterns: [], actionUpdates: [] });
+      },
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(makeState(), makeConfig(store));
+
+    expect(capturedPrompt).toMatch(/Time: \w+, \d{4}-\d{2}-\d{2} \d{2}:\d{2} (AM|PM)/);
+  });
+
   test("returns empty array when LLM finds no patterns", async () => {
     const store = new InMemoryStore();
     const ollama: OllamaAdapter = {

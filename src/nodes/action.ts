@@ -6,6 +6,7 @@ import type { Config } from "../config.ts";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { collectPreviousDigests } from "../digest/cli.ts";
 import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/seed-actions.ts";
+import { formatTime } from "./format-time.ts";
 
 interface MemoryInfo {
   key: string;
@@ -45,17 +46,6 @@ function extractJson(text: string): string {
     return codeBlockMatch[1]!.trim();
   }
   return text.trim();
-}
-
-function formatTime(date: Date): string {
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const dayOfWeek = days[date.getDay()];
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const hh = String(date.getHours()).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
-  return `${dayOfWeek}, ${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
 interface LogEntry {
