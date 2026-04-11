@@ -14,7 +14,7 @@ function makeState(overrides = {}) {
       confidence: 0.9,
     },
     decision: {
-      action: "log_only",
+      action: "none",
       priority: "low" as const,
       reason: "normal activity",
     },

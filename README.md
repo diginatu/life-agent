@@ -100,7 +100,7 @@ The agent runs a 7-node LangGraph pipeline on each invocation:
 
 Actions are data-driven via `config.yml`; see that file for the current set.
 
-All nodes degrade gracefully on failure (fail-closed to `log_only`).
+All nodes degrade gracefully on failure (fail-closed to `none`).
 
 ## License
 

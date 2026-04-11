@@ -6,7 +6,7 @@ const sampleEntries = [
   {
     eventId: "1",
     timestamp: "2026-03-29T09:00:00.000Z",
-    decision: { action: "log_only", priority: "low", reason: "routine" },
+    decision: { action: "none", priority: "low", reason: "routine" },
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
     message: null,
     errors: [],

@@ -36,14 +36,11 @@ settings:
   responseStyle: English, friendly and concise
 
 # Action definitions
-# - active: true = triggers Discord notification; false = log-only
+# - active: true = triggers Discord notification; false = logged only, no notification
 # - description: seed value for LLM context; evolved at runtime via memory store
 # - fallback: notification shown when LLM message drafting fails (required for active actions)
 actions:
   none:
-    active: false
-
-  log_only:
     active: false
 
   nudge_break:

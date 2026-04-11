@@ -11,7 +11,7 @@ const sampleEntries = [
     eventId: "1",
     timestamp: "2026-03-29T09:00:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
-    decision: { action: "log_only", priority: "low", reason: "routine" },
+    decision: { action: "none", priority: "low", reason: "routine" },
     message: null,
     errors: [],
   },
@@ -19,7 +19,7 @@ const sampleEntries = [
     eventId: "2",
     timestamp: "2026-03-29T09:15:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.85 },
-    decision: { action: "log_only", priority: "low", reason: "duplicate" },
+    decision: { action: "none", priority: "low", reason: "duplicate" },
     message: null,
     errors: [],
   },
@@ -43,7 +43,7 @@ const sampleEntries = [
     eventId: "5",
     timestamp: "2026-03-29T14:00:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "reading", confidence: 0.75 },
-    decision: { action: "log_only", priority: "low", reason: "different activity" },
+    decision: { action: "none", priority: "low", reason: "different activity" },
     message: null,
     errors: ["summarize: ollama timeout"],
   },
@@ -52,9 +52,8 @@ const sampleEntries = [
 describe("buildStats", () => {
   test("counts actions correctly", () => {
     const stats = buildStats(sampleEntries);
-    expect(stats.actionCounts.log_only).toBe(3);
+    expect(stats.actionCounts.none).toBe(4);
     expect(stats.actionCounts.nudge_break).toBe(1);
-    expect(stats.actionCounts.none).toBe(1);
   });
 
   test("computes time range", () => {
@@ -112,7 +111,7 @@ describe("generateDigest", () => {
 
     expect(result).toContain("2026-03-29");
     expect(result).toContain("5"); // total entries
-    expect(result).toContain("log_only");
+    expect(result).toContain("none");
     expect(result).toContain("nudge_break");
   });
 
@@ -218,7 +217,7 @@ describe("shouldRunDigest", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async () => {},
       readLastNLines: async () => [
-        { timestamp: "2026-03-31T09:00:00.000Z", tags: [], decision: { action: "log_only" } },
+        { timestamp: "2026-03-31T09:00:00.000Z", tags: [], decision: { action: "none" } },
       ],
     };
     expect(await shouldRunDigest(fs, "./logs", now)).toBe(true);

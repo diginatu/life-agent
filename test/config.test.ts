@@ -16,8 +16,6 @@ settings:
 actions:
   none:
     active: false
-  log_only:
-    active: false
   nudge_break:
     active: true
     description: "Suggest the user take a short break"
@@ -36,15 +34,11 @@ const MINIMAL_YAML = `
 actions:
   none:
     active: false
-  log_only:
-    active: false
 `;
 
 const CUSTOM_ACTION_YAML = `
 actions:
   none:
-    active: false
-  log_only:
     active: false
   nudge_hydrate:
     active: true
@@ -96,8 +90,6 @@ settings:
 actions:
   none:
     active: false
-  log_only:
-    active: false
 `;
       const config = loadConfig(yaml);
       expect(config.settings.responseStyle).toBe("日本語、丁寧で優しい口調");
@@ -110,8 +102,6 @@ settings:
 actions:
   none:
     active: false
-  log_only:
-    active: false
 `;
       expect(() => loadConfig(yaml)).toThrow();
     });
@@ -122,7 +112,7 @@ actions:
     test("parses actions with all fields", () => {
       const config = loadConfig(VALID_YAML);
       expect(Object.keys(config.actions)).toEqual([
-        "none", "log_only", "nudge_break", "nudge_sleep",
+        "none", "nudge_break", "nudge_sleep",
       ]);
       expect(config.actions.nudge_break!.active).toBe(true);
       expect(config.actions.nudge_break!.description).toBe("Suggest the user take a short break");
@@ -143,17 +133,11 @@ actions:
     test("rejects config without none action", () => {
       const yaml = `
 actions:
-  log_only:
-    active: false
-`;
-      expect(() => loadConfig(yaml)).toThrow();
-    });
-
-    test("rejects config without log_only action", () => {
-      const yaml = `
-actions:
-  none:
-    active: false
+  nudge_break:
+    active: true
+    fallback:
+      title: t
+      body: b
 `;
       expect(() => loadConfig(yaml)).toThrow();
     });
@@ -166,8 +150,6 @@ actions:
       const yaml = `
 actions:
   none:
-    active: false
-  log_only:
     active: false
   nudge_break:
     active: true
@@ -184,7 +166,7 @@ actions:
   describe("helpers", () => {
     test("getActionNames returns all action names", () => {
       const config = loadConfig(VALID_YAML);
-      expect(config.getActionNames()).toEqual(["none", "log_only", "nudge_break", "nudge_sleep"]);
+      expect(config.getActionNames()).toEqual(["none", "nudge_break", "nudge_sleep"]);
     });
 
     test("getActiveActions returns only active actions", () => {
@@ -194,7 +176,7 @@ actions:
 
     test("getPassiveActions returns only passive actions", () => {
       const config = loadConfig(VALID_YAML);
-      expect(config.getPassiveActions()).toEqual(["none", "log_only"]);
+      expect(config.getPassiveActions()).toEqual(["none"]);
     });
 
     test("getFallbackMessage returns fallback for active action", () => {
@@ -218,14 +200,14 @@ actions:
     test("isActiveAction checks correctly", () => {
       const config = loadConfig(VALID_YAML);
       expect(config.isActiveAction("nudge_break")).toBe(true);
-      expect(config.isActiveAction("log_only")).toBe(false);
+      expect(config.isActiveAction("none")).toBe(false);
       expect(config.isActiveAction("unknown_action")).toBe(false);
     });
 
     test("works with custom actions", () => {
       const config = loadConfig(CUSTOM_ACTION_YAML);
       expect(config.getActiveActions()).toEqual(["nudge_hydrate", "nudge_posture"]);
-      expect(config.getPassiveActions()).toEqual(["none", "log_only"]);
+      expect(config.getPassiveActions()).toEqual(["none"]);
       expect(config.getFallbackMessage("nudge_hydrate")).toEqual({
         title: "Stay hydrated",
         body: "Time to drink some water.",

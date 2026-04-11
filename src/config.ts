@@ -50,15 +50,8 @@ export interface Config {
 }
 
 function validate(raw: z.infer<typeof RawConfigSchema>): void {
-  const names = Object.keys(raw.actions);
-  if (names.length < 2) {
-    throw new Error("Config must define at least 'none' and 'log_only' actions");
-  }
   if (!("none" in raw.actions)) {
     throw new Error("Config must include a 'none' action");
-  }
-  if (!("log_only" in raw.actions)) {
-    throw new Error("Config must include a 'log_only' action");
   }
   for (const [name, def] of Object.entries(raw.actions)) {
     if (def.active && !def.fallback) {

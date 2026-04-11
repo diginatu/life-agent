@@ -31,9 +31,6 @@ describe("seedActionDefinitions", () => {
 
     const none = await store.get(ACTION_DEFS_NS, "none");
     expect(none).toBeNull();
-
-    const logOnly = await store.get(ACTION_DEFS_NS, "log_only");
-    expect(logOnly).toBeNull();
   });
 
   test("does not overwrite existing entries", async () => {

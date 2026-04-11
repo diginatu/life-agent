@@ -103,7 +103,7 @@ describe("buildGraph (full pipeline)", () => {
 
     expect(result.capture).toBeUndefined();
     expect(result.summary).toBeUndefined();
-    expect(result.decision!.action).toBe("log_only");
+    expect(result.decision!.action).toBe("none");
     expect(result.message).toBeNull();
     expect(result.errors.length).toBeGreaterThan(0);
   });
@@ -114,21 +114,21 @@ describe("buildGraph (full pipeline)", () => {
 
     expect(result.capture).toBeDefined();
     expect(result.summary).toBeUndefined();
-    expect(result.decision!.action).toBe("log_only");
+    expect(result.decision!.action).toBe("none");
     expect(result.message).toBeNull();
     expect(result.errors.some((e: string) => e.includes("ollama"))).toBe(true);
   });
 
-  test("log_only action: no message drafted, no notification", async () => {
-    const logOnlyAction = JSON.stringify({
-      action: "log_only",
+  test("none action: no message drafted, no notification", async () => {
+    const noneAction = JSON.stringify({
+      action: "none",
       priority: "low",
       reason: "routine check",
     });
-    const graph = await buildGraph(config, allMocks({ ollamaGenerateResponses: [logOnlyAction] }));
+    const graph = await buildGraph(config, allMocks({ ollamaGenerateResponses: [noneAction] }));
     const result = await graph.invoke({});
 
-    expect(result.decision!.action).toBe("log_only");
+    expect(result.decision!.action).toBe("none");
     expect(result.message).toBeNull();
   });
 });

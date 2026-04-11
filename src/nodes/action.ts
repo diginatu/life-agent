@@ -34,7 +34,7 @@ interface ActionNodeResult {
 }
 
 const FALLBACK_DECISION: ActionSelection = {
-  action: "log_only",
+  action: "none",
   priority: "low",
   reason: "fallback: action selection failed",
 };

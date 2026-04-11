@@ -5,8 +5,6 @@ const minimalYaml = `
 actions:
   none:
     active: false
-  log_only:
-    active: false
 `;
 
 test("webPort defaults to 3000 when not specified", () => {
@@ -20,8 +18,6 @@ settings:
   webPort: 8080
 actions:
   none:
-    active: false
-  log_only:
     active: false
 `;
   const config = loadConfig(yaml);
@@ -39,8 +35,6 @@ settings:
   discordChannelId: "123456789"
 actions:
   none:
-    active: false
-  log_only:
     active: false
 `;
   const config = loadConfig(yaml);

@@ -107,7 +107,7 @@ function buildDigestPrompt(date: string, stats: DayStats, entries: LogEntry[], r
     action: e.decision?.action,
     activity: e.summary?.activityGuess,
     posture: e.summary?.activityGuess ? undefined : undefined,
-    reason: e.decision?.action !== "log_only" ? (e.decision as Record<string, unknown>)?.reason : undefined,
+    reason: (e.decision as Record<string, unknown>)?.reason,
   }));
 
   let previousDigestSection = "";

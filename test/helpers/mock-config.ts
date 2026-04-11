@@ -3,7 +3,6 @@ import { stringify as yamlStringify } from "yaml";
 
 const DEFAULT_ACTIONS: Record<string, Record<string, unknown>> = {
   none: { active: false },
-  log_only: { active: false },
   nudge_break: {
     active: true,
     description: "Suggest the user take a short break",

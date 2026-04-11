@@ -76,24 +76,24 @@ describe("action node", () => {
     expect(ActionSelectionSchema.safeParse(result.decision).success).toBe(true);
   });
 
-  test("falls back to log_only on Ollama error", async () => {
+  test("falls back to none on Ollama error", async () => {
     const node = createActionNode({ ollama: errorOllama(), actionsConfig });
     const result = await node(makeState());
 
-    expect(result.decision!.action).toBe("log_only");
+    expect(result.decision!.action).toBe("none");
     expect(result.errors!.length).toBeGreaterThan(0);
     expect(result.errors![0]).toContain("ollama");
   });
 
-  test("falls back to log_only on invalid JSON from Ollama", async () => {
+  test("falls back to none on invalid JSON from Ollama", async () => {
     const node = createActionNode({ ollama: mockOllama("not json at all"), actionsConfig });
     const result = await node(makeState());
 
-    expect(result.decision!.action).toBe("log_only");
+    expect(result.decision!.action).toBe("none");
     expect(result.errors!.length).toBeGreaterThan(0);
   });
 
-  test("falls back to log_only on schema validation failure", async () => {
+  test("falls back to none on schema validation failure", async () => {
     const invalidSchema = JSON.stringify({
       action: 123,
       priority: "invalid_priority",
@@ -101,7 +101,7 @@ describe("action node", () => {
     const node = createActionNode({ ollama: mockOllama(invalidSchema), actionsConfig });
     const result = await node(makeState());
 
-    expect(result.decision!.action).toBe("log_only");
+    expect(result.decision!.action).toBe("none");
     expect(result.errors!.length).toBeGreaterThan(0);
   });
 
@@ -117,7 +117,7 @@ describe("action node", () => {
     const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node({});
 
-    expect(result.decision!.action).toBe("log_only");
+    expect(result.decision!.action).toBe("none");
     expect(result.errors!.length).toBeGreaterThan(0);
   });
 
@@ -187,7 +187,7 @@ const historyEntries = [
   {
     timestamp: "2026-03-31T09:00:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
-    decision: { action: "log_only", priority: "low", reason: "routine" },
+    decision: { action: "none", priority: "low", reason: "routine" },
   },
   {
     timestamp: "2026-03-31T10:00:00.000Z",

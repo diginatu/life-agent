@@ -155,7 +155,7 @@ describe("LogEntrySchema", () => {
     },
     policy: null,
     decision: {
-      action: "log_only" as const,
+      action: "none" as const,
       priority: "low" as const,
       reason: "routine logging",
     },

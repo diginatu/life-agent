@@ -53,7 +53,7 @@ const HTML_PAGE = `<!DOCTYPE html>
   <div id="digest" class="digest" style="display:none"></div>
 
   <script>
-    const PASSIVE = new Set(["none", "log_only"]);
+    const PASSIVE = new Set(["none"]);
     const datePicker = document.getElementById("date-picker");
     datePicker.value = new Date().toISOString().slice(0, 10);
 

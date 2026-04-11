@@ -56,14 +56,6 @@ describe("message node", () => {
     expect(result.errors).toBeUndefined();
   });
 
-  test("skips message for log_only action", async () => {
-    const node = createMessageNode({ ollama: mockOllama(), actionsConfig });
-    const result = await node(makeState("log_only"));
-
-    expect(result.message).toBeNull();
-    expect(result.errors).toBeUndefined();
-  });
-
   test("drafts message for nudge_break", async () => {
     const node = createMessageNode({ ollama: mockOllama(), actionsConfig });
     const result = await node(makeState("nudge_break"));

@@ -58,12 +58,12 @@ const baseState = {
     confidence: 0.8,
   },
   policy: {
-    availableActions: ["none", "log_only", "nudge_break", "nudge_sleep"] as const,
+    availableActions: ["none", "nudge_break", "nudge_sleep"] as const,
     cooldownBlocked: false,
     reasons: [],
   },
   decision: {
-    action: "log_only" as const,
+    action: "none" as const,
     priority: "low" as const,
     reason: "routine",
   },
@@ -186,7 +186,7 @@ describe("persist node", () => {
     const previousEntries = [
       {
         discordLastSeenMessageId: "prev-seen-id",
-        decision: { action: "log_only" },
+        decision: { action: "none" },
       },
     ];
     const fsWithPrev = mockFsWithPrevEntries(previousEntries);
