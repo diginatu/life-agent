@@ -9,7 +9,14 @@ type MockMessage = {
   content: string;
   author: { id: string; bot: boolean };
   createdAt: Date;
+  mentions: { has(userId: string): boolean };
 };
+
+function mentionsOf(ids: string[]): { has(userId: string): boolean } {
+  return { has: (id: string) => ids.includes(id) };
+}
+
+const noMentions = { has: () => false };
 
 function makeChannel(overrides: Partial<DiscordChannel> = {}): DiscordChannel {
   return {
@@ -90,6 +97,7 @@ describe("DiscordAdapter", () => {
             content: "Hello from user",
             author: { id: "user1", bot: false },
             createdAt: timestamp,
+            mentions: noMentions,
           },
         ],
         [
@@ -98,6 +106,7 @@ describe("DiscordAdapter", () => {
             content: "Bot message",
             author: { id: "bot1", bot: true },
             createdAt: timestamp,
+            mentions: noMentions,
           },
         ],
         [
@@ -106,6 +115,7 @@ describe("DiscordAdapter", () => {
             content: "Another user message",
             author: { id: "user2", bot: false },
             createdAt: timestamp,
+            mentions: noMentions,
           },
         ],
       ]);
@@ -153,9 +163,9 @@ describe("DiscordAdapter", () => {
     test("filters out messages from users other than allowedUserId", async () => {
       const timestamp = new Date("2024-01-01T12:00:00Z");
       const messages = new Map<string, MockMessage>([
-        ["msg1", { content: "Allowed user", author: { id: "user1", bot: false }, createdAt: timestamp }],
-        ["msg2", { content: "Other user", author: { id: "user2", bot: false }, createdAt: timestamp }],
-        ["msg3", { content: "Bot", author: { id: "bot1", bot: true }, createdAt: timestamp }],
+        ["msg1", { content: "Allowed user", author: { id: "user1", bot: false }, createdAt: timestamp, mentions: noMentions }],
+        ["msg2", { content: "Other user", author: { id: "user2", bot: false }, createdAt: timestamp, mentions: noMentions }],
+        ["msg3", { content: "Bot", author: { id: "bot1", bot: true }, createdAt: timestamp, mentions: noMentions }],
       ]);
 
       const channel = makeChannel({
@@ -175,8 +185,8 @@ describe("DiscordAdapter", () => {
     test("returns all non-bot messages when allowedUserId is omitted", async () => {
       const timestamp = new Date("2024-01-01T12:00:00Z");
       const messages = new Map<string, MockMessage>([
-        ["msg1", { content: "User one", author: { id: "user1", bot: false }, createdAt: timestamp }],
-        ["msg2", { content: "User two", author: { id: "user2", bot: false }, createdAt: timestamp }],
+        ["msg1", { content: "User one", author: { id: "user1", bot: false }, createdAt: timestamp, mentions: noMentions }],
+        ["msg2", { content: "User two", author: { id: "user2", bot: false }, createdAt: timestamp, mentions: noMentions }],
       ]);
 
       const channel = makeChannel({
@@ -200,6 +210,7 @@ describe("DiscordAdapter", () => {
             content: "Bot only",
             author: { id: "bot1", bot: true },
             createdAt: timestamp,
+            mentions: noMentions,
           },
         ],
       ]);
@@ -215,6 +226,78 @@ describe("DiscordAdapter", () => {
 
       expect(replies).toEqual([]);
     });
+
+    test("when botUserId is set, drops messages that do not mention the bot", async () => {
+      const timestamp = new Date("2024-01-01T12:00:00Z");
+      const messages = new Map<string, MockMessage>([
+        ["msg1", { content: "random chatter", author: { id: "user1", bot: false }, createdAt: timestamp, mentions: noMentions }],
+        ["msg2", { content: "unrelated", author: { id: "user2", bot: false }, createdAt: timestamp, mentions: mentionsOf(["other-user"]) }],
+      ]);
+
+      const channel = makeChannel({
+        messages: { fetch: async () => messages as Map<string, MockMessage> },
+      });
+
+      const adapter = createDiscordAdapterFromChannel(channel, makeClient(), "bot-id-123");
+      const replies = await adapter.collectReplies("msg0");
+
+      expect(replies).toEqual([]);
+    });
+
+    test("when botUserId is set, keeps messages that mention the bot (direct or reply)", async () => {
+      const timestamp = new Date("2024-01-01T12:00:00Z");
+      const messages = new Map<string, MockMessage>([
+        ["msg1", { content: "@bot hello", author: { id: "user1", bot: false }, createdAt: timestamp, mentions: mentionsOf(["bot-id-123"]) }],
+        ["msg2", { content: "reply to bot", author: { id: "user2", bot: false }, createdAt: timestamp, mentions: mentionsOf(["bot-id-123"]) }],
+        ["msg3", { content: "nope", author: { id: "user3", bot: false }, createdAt: timestamp, mentions: noMentions }],
+      ]);
+
+      const channel = makeChannel({
+        messages: { fetch: async () => messages as Map<string, MockMessage> },
+      });
+
+      const adapter = createDiscordAdapterFromChannel(channel, makeClient(), "bot-id-123");
+      const replies = await adapter.collectReplies("msg0");
+
+      expect(replies).toHaveLength(2);
+      expect(replies.map((r) => r.text)).toEqual(["@bot hello", "reply to bot"]);
+    });
+
+    test("botUserId filter composes with allowedUserId", async () => {
+      const timestamp = new Date("2024-01-01T12:00:00Z");
+      const messages = new Map<string, MockMessage>([
+        ["msg1", { content: "allowed + mentions bot", author: { id: "user1", bot: false }, createdAt: timestamp, mentions: mentionsOf(["bot-id-123"]) }],
+        ["msg2", { content: "allowed but no mention", author: { id: "user1", bot: false }, createdAt: timestamp, mentions: noMentions }],
+        ["msg3", { content: "other user mentions bot", author: { id: "user2", bot: false }, createdAt: timestamp, mentions: mentionsOf(["bot-id-123"]) }],
+      ]);
+
+      const channel = makeChannel({
+        messages: { fetch: async () => messages as Map<string, MockMessage> },
+      });
+
+      const adapter = createDiscordAdapterFromChannel(channel, makeClient(), "bot-id-123");
+      const replies = await adapter.collectReplies("msg0", "user1");
+
+      expect(replies).toHaveLength(1);
+      expect(replies[0]!.text).toBe("allowed + mentions bot");
+    });
+
+    test("without botUserId, mentions.has is ignored (regression guard)", async () => {
+      const timestamp = new Date("2024-01-01T12:00:00Z");
+      const messages = new Map<string, MockMessage>([
+        ["msg1", { content: "no mentions", author: { id: "user1", bot: false }, createdAt: timestamp, mentions: noMentions }],
+        ["msg2", { content: "mentions someone else", author: { id: "user2", bot: false }, createdAt: timestamp, mentions: mentionsOf(["someone"]) }],
+      ]);
+
+      const channel = makeChannel({
+        messages: { fetch: async () => messages as Map<string, MockMessage> },
+      });
+
+      const adapter = createDiscordAdapterFromChannel(channel, makeClient());
+      const replies = await adapter.collectReplies("msg0");
+
+      expect(replies).toHaveLength(2);
+    });
   });
 
   describe("getLatestMessageId", () => {
@@ -226,6 +309,7 @@ describe("DiscordAdapter", () => {
             content: "Latest message",
             author: { id: "user1", bot: false },
             createdAt: new Date("2024-01-01T12:00:00Z"),
+            mentions: noMentions,
           },
         ],
       ]);

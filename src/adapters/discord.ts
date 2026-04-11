@@ -3,7 +3,7 @@ import { Client, GatewayIntentBits } from "discord.js";
 export interface DiscordChannel {
   send(options: unknown): Promise<{ id: string }>;
   messages: {
-    fetch(options: { after: string } | { limit: number }): Promise<Map<string, { content: string; author: { id: string; bot: boolean }; createdAt: Date }>>;
+    fetch(options: { after: string } | { limit: number }): Promise<Map<string, { content: string; author: { id: string; bot: boolean }; createdAt: Date; mentions: { has(userId: string): boolean } }>>;
   };
 }
 
@@ -19,7 +19,7 @@ export interface DiscordAdapter {
   destroy(): Promise<void>;
 }
 
-export function createDiscordAdapterFromChannel(channel: DiscordChannel, client: DiscordClient): DiscordAdapter {
+export function createDiscordAdapterFromChannel(channel: DiscordChannel, client: DiscordClient, botUserId?: string): DiscordAdapter {
   return {
     async sendMessage(body: string, mentionUserId?: string): Promise<string> {
       const content = mentionUserId ? `<@${mentionUserId}> ${body}` : body;
@@ -38,6 +38,7 @@ export function createDiscordAdapterFromChannel(channel: DiscordChannel, client:
       for (const [, message] of messages) {
         if (message.author.bot) continue;
         if (allowedUserId && message.author.id !== allowedUserId) continue;
+        if (botUserId && !message.mentions.has(botUserId)) continue;
         replies.push({
           text: message.content,
           userId: message.author.id,
@@ -73,5 +74,10 @@ export async function createDiscordAdapter(token: string, channelId: string): Pr
 
   const channel = await client.channels.fetch(channelId);
 
-  return createDiscordAdapterFromChannel(channel as unknown as DiscordChannel, client);
+  const botUserId = client.user?.id;
+  if (!botUserId) {
+    throw new Error("Discord client.user is null after login");
+  }
+
+  return createDiscordAdapterFromChannel(channel as unknown as DiscordChannel, client, botUserId);
 }
