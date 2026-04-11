@@ -18,6 +18,7 @@ interface PersistNodeState {
   summary?: SceneSummary;
   decision?: ActionSelection;
   message?: DraftMessage | null;
+  userFeedback?: { text: string; userId: string; timestamp: string }[];
   errors?: string[];
 }
 
@@ -31,29 +32,6 @@ export function createPersistNode(deps: PersistNodeDeps) {
   return async (state: PersistNodeState): Promise<PersistNodeResult> => {
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10);
-
-    // Collect feedback from previous Discord message if applicable
-    let feedbackFromPrevious: { text: string; userId: string; timestamp: string }[] | null = null;
-    if (discord) {
-      try {
-        const lastEntries = await fs.readLastNLines(config.logDir, dateStr, 1);
-        if (lastEntries.length > 0) {
-          const prevEntry = lastEntries[lastEntries.length - 1] as Record<string, unknown>;
-          const prevMsgId = (prevEntry.discordMessageId ?? prevEntry.discordLastSeenMessageId) as string | undefined;
-          if (prevMsgId) {
-            const replies = await discord.collectReplies(
-              prevMsgId,
-              actionsConfig.settings.discordMentionUserId || undefined,
-            );
-            if (replies.length > 0) {
-              feedbackFromPrevious = replies;
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`persist: discord feedback error: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
 
     // Send Discord message for active actions
     let discordMessageId: string | null = null;
@@ -96,8 +74,8 @@ export function createPersistNode(deps: PersistNodeDeps) {
     if (discordLastSeenMessageId) {
       logEntry.discordLastSeenMessageId = discordLastSeenMessageId;
     }
-    if (feedbackFromPrevious) {
-      logEntry.feedbackFromPrevious = feedbackFromPrevious;
+    if (state.userFeedback && state.userFeedback.length > 0) {
+      logEntry.feedbackFromPrevious = state.userFeedback;
     }
 
     // Write to JSONL

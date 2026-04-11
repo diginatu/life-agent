@@ -394,6 +394,55 @@ describe("action node with history", () => {
     expect(capturedPrompt).toContain("Thanks, I will stretch now");
   });
 
+  test("includes latest user reply section from state.userFeedback in prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFs(historyEntries),
+      logDir: "./logs",
+      now: () => new Date("2026-03-31T11:00:00.000Z"),
+    });
+    await node(
+      makeState({
+        userFeedback: [
+          { text: "I'm on a call, skip nudges", userId: "u1", timestamp: "2026-03-31T10:55:00.000Z" },
+        ],
+      }),
+    );
+
+    expect(capturedPrompt).toContain("Latest user reply");
+    expect(capturedPrompt).toContain("I'm on a call, skip nudges");
+    // Latest user reply must appear BEFORE Recent history in prompt order
+    const replyIdx = capturedPrompt.indexOf("Latest user reply");
+    const historyIdx = capturedPrompt.indexOf("Recent history");
+    expect(replyIdx).toBeGreaterThan(-1);
+    expect(historyIdx).toBeGreaterThan(-1);
+    expect(replyIdx).toBeLessThan(historyIdx);
+  });
+
+  test("does not include Latest user reply section when userFeedback is empty or absent", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    await node(makeState({ userFeedback: [] }));
+
+    expect(capturedPrompt).not.toContain("Latest user reply");
+  });
+
   test("works without fs deps (backward compatible)", async () => {
     const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node(makeState());

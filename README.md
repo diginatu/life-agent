@@ -91,9 +91,9 @@ See `config.yml` for all available settings and their defaults.
 The agent runs a 7-node LangGraph pipeline on each invocation:
 
 1. **Capture** — grabs a webcam frame via ffmpeg
-2. **Summarize** — sends the image to Ollama for scene description
-3. **Policy** — applies deterministic rules (quiet hours, cooldown, dedup)
-4. **Action** — LLM selects an action from the allowed set
+2. **CollectFeedback** — pulls any new Discord replies since the last run and attaches them to state so the action step can react in the same run
+3. **Summarize** — sends the image to Ollama for scene description
+4. **Action** — LLM selects an action from the allowed set, using history, digests, long-term patterns, and the latest user reply
 5. **Message** — LLM drafts a notification message (if needed)
 6. **Persist** — writes JSONL log + sends Discord notification
 7. **ExtractMemories** — LLM distills the observation into long-term user patterns, then runs a duplicate-merge pass and caps the pattern store (LRU by `observedCount`)

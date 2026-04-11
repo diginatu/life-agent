@@ -44,15 +44,6 @@ function mockDiscord(
   };
 }
 
-function mockFsWithPrevEntries(prevEntries: unknown[]): FilesystemAdapter & { written: unknown[] } {
-  const written: unknown[] = [];
-  return {
-    written,
-    appendJsonLine: async (_dir, _date, data) => { written.push(data); },
-    readLastNLines: async () => prevEntries,
-  };
-}
-
 const baseState = {
   capture: {
     imagePath: "captures/test.jpg",
@@ -170,74 +161,48 @@ describe("persist node", () => {
     await node(state);
   });
 
-  test("collects feedback from previous Discord message", async () => {
-    const previousEntries = [
-      {
-        discordMessageId: "prev-msg-id",
-        decision: { action: "nudge_break" },
-      },
+  test("persists state.userFeedback into log entry as feedbackFromPrevious", async () => {
+    const fs = mockFs();
+    const discord = mockDiscord();
+    const node = createPersistNode({ fs, config: { logDir: "./logs" }, actionsConfig, discord });
+
+    const feedback = [
+      { text: "ok thanks", userId: "user1", timestamp: "2026-04-11T10:05:00.000Z" },
     ];
-    const fsWithPrev = mockFsWithPrevEntries(previousEntries);
-    const discord = mockDiscord([
-      { text: "ok thanks", userId: "user1", timestamp: "2026-03-29T14:05:00.000Z" },
-    ]);
-    const node = createPersistNode({ fs: fsWithPrev, config: { logDir: "./logs" }, actionsConfig, discord });
+    await node({ ...baseState, userFeedback: feedback });
 
-    await node(baseState);
-
-    const entry = fsWithPrev.written[0] as Record<string, unknown>;
-    const feedback = entry.feedbackFromPrevious as Array<Record<string, string>>;
-    expect(feedback).toHaveLength(1);
-    expect(feedback[0]!.text).toBe("ok thanks");
+    const entry = fs.written[0] as Record<string, unknown>;
+    expect(entry.feedbackFromPrevious).toEqual(feedback);
   });
 
-  test("passes discordMentionUserId to collectReplies to restrict replies to that user", async () => {
-    const previousEntries = [
-      { discordMessageId: "prev-msg-id", decision: { action: "nudge_break" } },
-    ];
-    const fsWithPrev = mockFsWithPrevEntries(previousEntries);
-
-    const calls: Array<{ afterId: string; allowedUserId?: string }> = [];
+  test("does not call discord.collectReplies (moved to collect-feedback node)", async () => {
+    let called = false;
     const discord: DiscordAdapter = {
-      sendMessage: async () => "discord-msg-1",
-      sendEmbed: async () => "discord-msg-1",
-      collectReplies: async (afterId: string, allowedUserId?: string) => {
-        calls.push({ afterId, allowedUserId });
+      sendMessage: async () => "msg",
+      sendEmbed: async () => "msg",
+      collectReplies: async () => {
+        called = true;
         return [];
       },
       destroy: async () => {},
       getLatestMessageId: async () => "latest",
     };
-
-    const cfg = mockActionsConfig({}, { discordMentionUserId: "user-123" });
-    const node = createPersistNode({ fs: fsWithPrev, config: { logDir: "./logs" }, actionsConfig: cfg, discord });
+    const fs = mockFs();
+    const node = createPersistNode({ fs, config: { logDir: "./logs" }, actionsConfig, discord });
 
     await node(baseState);
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.afterId).toBe("prev-msg-id");
-    expect(calls[0]!.allowedUserId).toBe("user-123");
+    expect(called).toBe(false);
   });
 
-  test("collects feedback using discordLastSeenMessageId when no discordMessageId in prev entry", async () => {
-    const previousEntries = [
-      {
-        discordLastSeenMessageId: "prev-seen-id",
-        decision: { action: "none" },
-      },
-    ];
-    const fsWithPrev = mockFsWithPrevEntries(previousEntries);
-    const discord = mockDiscord([
-      { text: "feedback without embed", userId: "user2", timestamp: "2026-03-29T15:00:00.000Z" },
-    ]);
-    const node = createPersistNode({ fs: fsWithPrev, config: { logDir: "./logs" }, actionsConfig, discord });
+  test("omits feedbackFromPrevious when state.userFeedback is empty or absent", async () => {
+    const fs = mockFs();
+    const node = createPersistNode({ fs, config: { logDir: "./logs" }, actionsConfig });
 
-    await node(baseState);
+    await node({ ...baseState, userFeedback: [] });
 
-    const entry = fsWithPrev.written[0] as Record<string, unknown>;
-    const feedback = entry.feedbackFromPrevious as Array<Record<string, string>>;
-    expect(feedback).toHaveLength(1);
-    expect(feedback[0]!.text).toBe("feedback without embed");
+    const entry = fs.written[0] as Record<string, unknown>;
+    expect(entry.feedbackFromPrevious).toBeUndefined();
   });
 
   test("stores discordLastSeenMessageId when no embed is sent", async () => {

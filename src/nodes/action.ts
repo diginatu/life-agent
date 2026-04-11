@@ -25,8 +25,15 @@ interface ActionNodeDeps {
   now?: () => Date;
 }
 
+interface UserFeedbackEntry {
+  text: string;
+  userId: string;
+  timestamp: string;
+}
+
 interface ActionNodeState {
   summary?: SceneSummary;
+  userFeedback?: UserFeedbackEntry[];
 }
 
 interface ActionNodeResult {
@@ -101,7 +108,17 @@ function formatHistory(entries: LogEntry[], digestInfos?: DigestInfo[]): { histo
   };
 }
 
-function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[], memories?: MemoryInfo[], actionDefs?: Map<string, string>): string {
+function formatUserFeedback(feedback: UserFeedbackEntry[]): string {
+  const lines = feedback.map((f) => {
+    const time = f.timestamp
+      ? new Date(f.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+      : "??:??";
+    return `  - [${time}] ${f.text}`;
+  });
+  return `\nLatest user reply (since last nudge):\n${lines.join("\n")}\n`;
+}
+
+function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[], memories?: MemoryInfo[], actionDefs?: Map<string, string>, userFeedback?: UserFeedbackEntry[]): string {
   const allActions = actionsConfig.getActionNames();
   const actionDescriptions = allActions
     .map((a) => {
@@ -118,6 +135,9 @@ function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: 
     for (const d of digests) {
       historySections += `\n[${d.date}]\n${d.content}\n`;
     }
+  }
+  if (userFeedback && userFeedback.length > 0) {
+    historySections += formatUserFeedback(userFeedback);
   }
   if (history) {
     historySections += `\nRecent history:\n${history}\n`;
@@ -213,7 +233,7 @@ export function createActionNode(deps: ActionNodeDeps) {
       // best-effort
     }
 
-    const prompt = buildPrompt(state.summary, deps.actionsConfig, currentTime, logEntries, digestInfos, memories, actionDefs);
+    const prompt = buildPrompt(state.summary, deps.actionsConfig, currentTime, logEntries, digestInfos, memories, actionDefs, state.userFeedback);
 
     let rawResponse: string;
     try {

@@ -4,7 +4,7 @@ Life Agent captures webcam images, analyzes them with a local LLM (Ollama), and 
 
 ## Architecture
 
-7-node LangGraph pipeline: Capture → Summarize → Policy → Action → Message → Persist → ExtractMemories.
+7-node LangGraph pipeline: Capture → CollectFeedback → Summarize → Action → Message → Persist → ExtractMemories.
 Each node is a factory function (`createXxxNode(deps)`) returning an async state handler.
 Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore for dry-run) accessible via `config.store` in nodes.
 
@@ -12,7 +12,7 @@ Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore fo
 
 - **Adapter DI**: External services (Ollama, filesystem, ffmpeg, Discord) injected as interfaces. `--dry-run` uses mocks.
 - **Config**: Zod-validated YAML (`config.yml` + `config.local.yml` override). Actions are data-driven.
-- **Policy engine**: Quiet hours, cooldown, confidence threshold, duplicate suppression gate active actions.
+- **Discord reply loop**: `CollectFeedback` node reads the last log entry's Discord cursor (`discordMessageId` or `discordLastSeenMessageId`), fetches replies via `discord.collectReplies`, and puts them on `state.userFeedback`. The `Action` node injects those replies into the LLM prompt in the same run (no multi-run delay). `Persist` writes them back to the log entry as `feedbackFromPrevious` for audit / history.
 - **Long-term memory**: `FileStore` (custom `BaseStore` subclass) persists learned user patterns to `{memoryDir}/store.json`. ExtractMemories node writes; Action node reads. After each write, `mergeDuplicatePatterns` (LLM-driven, threshold-gated) collapses near-duplicate keys into canonical ones, then `capUserPatterns` enforces a max pattern count by evicting lowest `observedCount` first (tiebreak: oldest `lastObserved`).
 - **Sprint convention**: Commits follow `feat: <description> (Sprint N)`.
 

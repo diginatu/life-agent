@@ -2,6 +2,7 @@ import { StateGraph, START, END } from "@langchain/langgraph";
 import type { BaseStore } from "@langchain/langgraph";
 import { GraphState } from "./state.ts";
 import { createCaptureNode } from "./nodes/capture.ts";
+import { createCollectFeedbackNode } from "./nodes/collect-feedback.ts";
 import { createSummarizeNode } from "./nodes/summarize.ts";
 import { createActionNode } from "./nodes/action.ts";
 import { createMessageNode } from "./nodes/message.ts";
@@ -66,6 +67,13 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     readFileBase64: deps.readFileBase64 ?? readFileBase64,
   });
 
+  const collectFeedbackNode = createCollectFeedbackNode({
+    fs,
+    logDir: s.logDir,
+    actionsConfig: config,
+    discord,
+    now: deps.now,
+  });
   const actionNode = createActionNode({ ollama, actionsConfig: config, fs, logDir: s.logDir, historyCount: s.actionHistoryCount, digestDays: s.actionDigestDays, now: deps.now });
   const messageNode = createMessageNode({ ollama, actionsConfig: config });
   const persistNode = createPersistNode({
@@ -81,13 +89,15 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
 
   return new StateGraph(GraphState)
     .addNode("capture_node", captureNode)
+    .addNode("collect_feedback_node", collectFeedbackNode)
     .addNode("summarize_node", summarizeNode)
     .addNode("action_node", actionNode)
     .addNode("message_node", messageNode)
     .addNode("persist_node", persistNode)
     .addNode("extract_memories_node", extractMemoriesNode)
     .addEdge(START, "capture_node")
-    .addEdge("capture_node", "summarize_node")
+    .addEdge("capture_node", "collect_feedback_node")
+    .addEdge("collect_feedback_node", "summarize_node")
     .addEdge("summarize_node", "action_node")
     .addEdge("action_node", "message_node")
     .addEdge("message_node", "persist_node")
