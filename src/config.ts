@@ -24,7 +24,6 @@ const SettingsSchema = z.object({
 export type Settings = z.infer<typeof SettingsSchema>;
 
 const FallbackMessageSchema = z.object({
-  title: z.string().min(1),
   body: z.string().min(1),
 });
 
@@ -47,7 +46,7 @@ export interface Config {
   getActionNames(): string[];
   getActiveActions(): string[];
   getPassiveActions(): string[];
-  getFallbackMessage(action: string): { title: string; body: string } | undefined;
+  getFallbackMessage(action: string): { body: string } | undefined;
   getDescription(action: string): string | undefined;
   isActiveAction(action: string): boolean;
 }

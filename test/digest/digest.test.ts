@@ -28,7 +28,7 @@ const sampleEntries = [
     timestamp: "2026-03-29T10:00:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.8 },
     decision: { action: "nudge_break", priority: "medium", reason: "long session" },
-    message: { title: "Break time!", body: "Stand up and stretch." },
+    message: { body: "Stand up and stretch — long session." },
     errors: [],
   },
   {
@@ -163,12 +163,14 @@ describe("runDigest with Discord", () => {
     const embeds: Array<{ title: string; body: string }> = [];
     return {
       embeds,
+      sendMessage: async () => "discord-msg-1",
       sendEmbed: async (title: string, body: string) => {
         embeds.push({ title, body });
         return "discord-msg-1";
       },
       collectReplies: async () => [],
       destroy: async () => {},
+      getLatestMessageId: async () => null,
     };
   }
 

@@ -56,8 +56,7 @@ export function createPersistNode(deps: PersistNodeDeps) {
     let discordMessageId: string | null = null;
     if (discord && state.decision && actionsConfig.isActiveAction(state.decision.action) && state.message) {
       try {
-        discordMessageId = await discord.sendEmbed(
-          state.message.title,
+        discordMessageId = await discord.sendMessage(
           state.message.body,
           actionsConfig.settings.discordMentionUserId || undefined,
         );
@@ -109,8 +108,10 @@ export function createPersistNode(deps: PersistNodeDeps) {
 
     // Print one-line summary
     const action = state.decision?.action ?? "unknown";
-    const messageTitle = state.message?.title ? ` "${state.message.title}"` : "";
-    console.log(`[${now.toISOString()}] action=${action}${messageTitle}`);
+    const preview = state.message?.body
+      ? ` "${state.message.body.slice(0, 60)}${state.message.body.length > 60 ? "…" : ""}"`
+      : "";
+    console.log(`[${now.toISOString()}] action=${action}${preview}`);
 
     return {};
   };

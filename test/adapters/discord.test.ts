@@ -51,27 +51,32 @@ describe("DiscordAdapter", () => {
       expect(opts.embeds[0].description).toBe("Test Body");
     });
 
-    test("sends mention as content when mentionUserId is provided", async () => {
+  });
+
+  describe("sendMessage", () => {
+    test("sends plain content message and returns message ID", async () => {
       let capturedOptions: unknown = null;
       const channel = makeChannel({
-        send: async (options: unknown) => { capturedOptions = options; return { id: "456" }; },
+        send: async (options: unknown) => { capturedOptions = options; return { id: "m1" }; },
       });
       const adapter = createDiscordAdapterFromChannel(channel, makeClient());
-      await adapter.sendEmbed("Title", "Body", "user123");
-      const opts = capturedOptions as { content: string; embeds: unknown[] };
-      expect(opts.content).toBe("<@user123>");
-      expect(opts.embeds).toHaveLength(1);
+      const id = await adapter.sendMessage("Take a short break, you've been coding for a while.");
+      expect(id).toBe("m1");
+      const opts = capturedOptions as { content: string; embeds?: unknown };
+      expect(opts.content).toBe("Take a short break, you've been coding for a while.");
+      expect(opts.embeds).toBeUndefined();
     });
 
-    test("does not include content when mentionUserId is omitted", async () => {
+    test("prefixes mention when mentionUserId is provided", async () => {
       let capturedOptions: unknown = null;
       const channel = makeChannel({
-        send: async (options: unknown) => { capturedOptions = options; return { id: "789" }; },
+        send: async (options: unknown) => { capturedOptions = options; return { id: "m2" }; },
       });
       const adapter = createDiscordAdapterFromChannel(channel, makeClient());
-      await adapter.sendEmbed("Title", "Body");
-      const opts = capturedOptions as Record<string, unknown>;
-      expect(opts.content).toBeUndefined();
+      await adapter.sendMessage("Stand up and stretch.", "user123");
+      const opts = capturedOptions as { content: string };
+      expect(opts.content).toContain("<@user123>");
+      expect(opts.content).toContain("Stand up and stretch.");
     });
   });
 

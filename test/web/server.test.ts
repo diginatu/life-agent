@@ -16,7 +16,7 @@ const sampleEntries = [
     timestamp: "2026-03-29T10:00:00.000Z",
     decision: { action: "nudge_break", priority: "medium", reason: "long session" },
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.85 },
-    message: { title: "Break time!", body: "Stand up." },
+    message: { body: "Stand up — long session." },
     errors: [],
   },
 ];

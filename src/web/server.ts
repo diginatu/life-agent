@@ -90,7 +90,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         const activity = e.summary?.activityGuess ?? "";
         const reason = e.decision?.reason ?? "";
         const msgHtml = e.message
-          ? '<div class="entry-message"><strong>' + esc(e.message.title) + '</strong> — ' + esc(e.message.body) + '</div>'
+          ? '<div class="entry-message">' + esc(e.message.body) + '</div>'
           : '';
         const errHtml = (e.errors && e.errors.length)
           ? '<div class="error">' + e.errors.map(esc).join('; ') + '</div>'

@@ -33,7 +33,11 @@ function buildPrompt(summary: SceneSummary, decision: ActionSelection, responseS
   const descLine = actionDescription ? `\n- Action description: ${actionDescription}` : "";
   return `Follow this response style: ${responseStyle}.
 
-You are a friendly personal assistant. Draft a short notification message for the user.
+You are a friendly personal assistant. Draft a Discord mention post for the user.
+This message will be posted in a Discord channel and will @mention the user.
+It is not a desktop notification, so you are not restricted to short text —
+feel free to include the reason or context naturally so the user understands
+why you're nudging them. Avoid hard length caps, but stay on topic.
 
 Context:
 - Action: ${decision.action}${descLine}
@@ -42,10 +46,9 @@ Context:
 - Activity: ${summary.activityGuess ?? "unknown"}
 - Posture: ${summary.posture}
 
-Write a concise notification. Return a JSON object with exactly these fields:
+Return a JSON object with exactly this field:
 {
-  "title": string (short, under 50 chars),
-  "body": string (1-2 sentences, friendly tone)
+  "body": string (the message content; may be multiple sentences and include reasons)
 }
 
 Return ONLY the JSON object, no other text.`;
@@ -56,7 +59,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
 
   function getFallback(action: string): DraftMessage {
     return actionsConfig.getFallbackMessage(action)
-      ?? { title: "Notification", body: "Life Agent has a suggestion for you." };
+      ?? { body: "Life Agent has a suggestion for you." };
   }
 
   return async (state: MessageNodeState, config?: LangGraphRunnableConfig): Promise<MessageNodeResult> => {

@@ -10,7 +10,7 @@ interface LogEntry {
     action?: string;
     [key: string]: unknown;
   };
-  message?: { title: string; body: string } | null;
+  message?: { body: string } | null;
   errors?: string[];
   [key: string]: unknown;
 }

@@ -18,11 +18,21 @@ function mockFs(): FilesystemAdapter & { written: unknown[] } {
 function mockDiscord(
   replies: Array<{ text: string; userId: string; timestamp: string }> = [],
   latestMessageId: string | null = "latest-channel-msg",
-): DiscordAdapter & { embeds: Array<{ title: string; body: string }> } {
+): DiscordAdapter & {
+  messages: Array<{ body: string; mentionUserId?: string }>;
+  embeds: Array<{ title: string; body: string }>;
+} {
   let msgCounter = 0;
+  const messages: Array<{ body: string; mentionUserId?: string }> = [];
   const embeds: Array<{ title: string; body: string }> = [];
   return {
+    messages,
     embeds,
+    sendMessage: async (body: string, mentionUserId?: string) => {
+      messages.push({ body, mentionUserId });
+      msgCounter++;
+      return `discord-msg-${msgCounter}`;
+    },
     sendEmbed: async (title: string, body: string) => {
       embeds.push({ title, body });
       msgCounter++;
@@ -127,13 +137,12 @@ describe("persist node", () => {
     const state = {
       ...baseState,
       decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
-      message: { title: "Break time!", body: "Stand up and stretch." },
+      message: { body: "Stand up and stretch — you've been sitting a while." },
     };
     await node(state);
 
-    expect(discord.embeds.length).toBe(1);
-    expect(discord.embeds[0]!.title).toBe("Break time!");
-    expect(discord.embeds[0]!.body).toBe("Stand up and stretch.");
+    expect(discord.messages.length).toBe(1);
+    expect(discord.messages[0]!.body).toBe("Stand up and stretch — you've been sitting a while.");
 
     const entry = fs.written[0] as Record<string, unknown>;
     expect(entry.discordMessageId).toBe("discord-msg-1");
@@ -146,7 +155,7 @@ describe("persist node", () => {
 
     await node(baseState);
 
-    expect(discord.embeds.length).toBe(0);
+    expect(discord.messages.length).toBe(0);
   });
 
   test("does not send to Discord when adapter not provided", async () => {
@@ -156,7 +165,7 @@ describe("persist node", () => {
     const state = {
       ...baseState,
       decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
-      message: { title: "Break!", body: "Stretch." },
+      message: { body: "Stretch." },
     };
     await node(state);
   });
@@ -223,7 +232,7 @@ describe("persist node", () => {
     const state = {
       ...baseState,
       decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
-      message: { title: "Break time!", body: "Stand up and stretch." },
+      message: { body: "Stand up and stretch." },
     };
     await node(state);
 
@@ -251,7 +260,7 @@ describe("persist node", () => {
     const state = {
       ...baseState,
       decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
-      message: { title: "Break time!", body: "Stand up." },
+      message: { body: "Stand up and take a walk." },
     };
 
     // Capture console.log output
@@ -264,6 +273,6 @@ describe("persist node", () => {
       console.log = origLog;
     }
 
-    expect(logs.some(l => l.includes("nudge_break") && l.includes("Break time!"))).toBe(true);
+    expect(logs.some(l => l.includes("nudge_break") && l.includes("Stand up"))).toBe(true);
   });
 });

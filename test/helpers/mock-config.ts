@@ -7,16 +7,14 @@ const DEFAULT_ACTIONS: Record<string, Record<string, unknown>> = {
     active: true,
     description: "Suggest the user take a short break",
     fallback: {
-      title: "Time for a break",
-      body: "You've been working for a while. Consider standing up and stretching.",
+      body: "Time for a break — you've been working for a while. Consider standing up and stretching.",
     },
   },
   nudge_sleep: {
     active: true,
     description: "Suggest the user go to sleep",
     fallback: {
-      title: "Time to wind down",
-      body: "It's getting late. Consider wrapping up and heading to bed.",
+      body: "Time to wind down — it's getting late. Consider wrapping up and heading to bed.",
     },
   },
 };

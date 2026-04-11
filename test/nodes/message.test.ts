@@ -9,8 +9,7 @@ import { mockActionsConfig } from "../helpers/mock-config.ts";
 const actionsConfig = mockActionsConfig();
 
 const validMessageJson = JSON.stringify({
-  title: "Time for a break!",
-  body: "You've been coding for a while. Stand up and stretch your legs.",
+  body: "Time for a break! You've been coding for a while — stand up and stretch your legs.",
 });
 
 function mockOllama(response = validMessageJson): OllamaAdapter {
@@ -61,20 +60,18 @@ describe("message node", () => {
     const result = await node(makeState("nudge_break"));
 
     expect(result.message).toBeDefined();
-    expect(result.message!.title).toBe("Time for a break!");
     expect(result.message!.body).toContain("coding");
   });
 
   test("drafts message for nudge_sleep", async () => {
     const sleepMessage = JSON.stringify({
-      title: "Time to wind down",
       body: "It's getting late. Consider heading to bed.",
     });
     const node = createMessageNode({ ollama: mockOllama(sleepMessage), actionsConfig });
     const result = await node(makeState("nudge_sleep"));
 
     expect(result.message).toBeDefined();
-    expect(result.message!.title).toBe("Time to wind down");
+    expect(result.message!.body).toContain("bed");
   });
 
   test("output matches DraftMessageSchema", async () => {
@@ -89,7 +86,7 @@ describe("message node", () => {
     const result = await node(makeState("nudge_break"));
 
     expect(result.message).toBeDefined();
-    expect(result.message!.title.length).toBeGreaterThan(0);
+    expect(result.message!.body.length).toBeGreaterThan(0);
     expect(result.errors!.length).toBeGreaterThan(0);
   });
 
@@ -98,7 +95,7 @@ describe("message node", () => {
     const result = await node(makeState("nudge_break"));
 
     expect(result.message).toBeDefined();
-    expect(result.message!.title.length).toBeGreaterThan(0);
+    expect(result.message!.body.length).toBeGreaterThan(0);
     expect(result.errors!.length).toBeGreaterThan(0);
   });
 
@@ -107,7 +104,7 @@ describe("message node", () => {
     const node = createMessageNode({ ollama: mockOllama(wrapped), actionsConfig });
     const result = await node(makeState("nudge_break"));
 
-    expect(result.message!.title).toBe("Time for a break!");
+    expect(result.message!.body).toContain("coding");
   });
 
   test("returns null message when no decision in state", async () => {

@@ -28,8 +28,7 @@ const validActionJson = JSON.stringify({
 });
 
 const validMessageJson = JSON.stringify({
-  title: "Time for a break!",
-  body: "You've been coding for a while. Stand up and stretch.",
+  body: "Time for a break! You've been coding for a while. Stand up and stretch.",
 });
 
 // generate() is called by action node first, then message node
@@ -95,7 +94,7 @@ describe("buildGraph (full pipeline)", () => {
     expect(result.decision).toBeDefined();
     expect(result.decision!.action).toBe("nudge_break");
     expect(result.message).toBeDefined();
-    expect(result.message!.title).toBe("Time for a break!");
+    expect(result.message!.body).toContain("break");
     expect(result.errors).toEqual([]);
   });
 

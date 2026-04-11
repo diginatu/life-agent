@@ -52,11 +52,17 @@ export function createDryRunDeps() {
   };
 
   const discord: DiscordAdapter = {
+    sendMessage: async (body, mentionUserId) => {
+      const prefix = mentionUserId ? `<@${mentionUserId}> ` : "";
+      console.log(`[dry-run] Would send Discord message: ${prefix}${body}`);
+      return "dry-run-msg-id";
+    },
     sendEmbed: async (title, body) => {
       console.log(`[dry-run] Would send Discord embed: "${title}" — ${body}`);
       return "dry-run-msg-id";
     },
     collectReplies: async () => [],
+    getLatestMessageId: async () => null,
     destroy: async () => {},
   };
 

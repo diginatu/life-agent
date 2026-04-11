@@ -1,8 +1,7 @@
 import { z } from "zod/v4";
 
 export const DraftMessageSchema = z.object({
-  title: z.string().min(1),
-  body: z.string(),
+  body: z.string().min(1),
 });
 
 export type DraftMessage = z.infer<typeof DraftMessageSchema>;

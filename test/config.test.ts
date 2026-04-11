@@ -20,13 +20,11 @@ actions:
     active: true
     description: "Suggest the user take a short break"
     fallback:
-      title: "Time for a break"
       body: "Consider standing up and stretching."
   nudge_sleep:
     active: true
     description: "Suggest the user go to sleep"
     fallback:
-      title: "Time to wind down"
       body: "Consider wrapping up and heading to bed."
 `;
 
@@ -44,13 +42,11 @@ actions:
     active: true
     description: "Remind the user to drink water"
     fallback:
-      title: "Stay hydrated"
       body: "Time to drink some water."
   nudge_posture:
     active: true
     description: "Remind the user to check posture"
     fallback:
-      title: "Check your posture"
       body: "Sit up straight and relax your shoulders."
 `;
 
@@ -117,7 +113,6 @@ actions:
       expect(config.actions.nudge_break!.active).toBe(true);
       expect(config.actions.nudge_break!.description).toBe("Suggest the user take a short break");
       expect(config.actions.nudge_break!.fallback).toEqual({
-        title: "Time for a break",
         body: "Consider standing up and stretching.",
       });
     });
@@ -127,7 +122,7 @@ actions:
       expect(Object.keys(config.actions)).toContain("nudge_hydrate");
       expect(Object.keys(config.actions)).toContain("nudge_posture");
       expect(config.actions.nudge_hydrate!.active).toBe(true);
-      expect(config.actions.nudge_hydrate!.fallback!.title).toBe("Stay hydrated");
+      expect(config.actions.nudge_hydrate!.fallback!.body).toBe("Time to drink some water.");
     });
 
     test("rejects config without none action", () => {
@@ -136,7 +131,6 @@ actions:
   nudge_break:
     active: true
     fallback:
-      title: t
       body: b
 `;
       expect(() => loadConfig(yaml)).toThrow();
@@ -182,7 +176,6 @@ actions:
     test("getFallbackMessage returns fallback for active action", () => {
       const config = loadConfig(VALID_YAML);
       expect(config.getFallbackMessage("nudge_break")).toEqual({
-        title: "Time for a break",
         body: "Consider standing up and stretching.",
       });
     });
@@ -209,7 +202,6 @@ actions:
       expect(config.getActiveActions()).toEqual(["nudge_hydrate", "nudge_posture"]);
       expect(config.getPassiveActions()).toEqual(["none"]);
       expect(config.getFallbackMessage("nudge_hydrate")).toEqual({
-        title: "Stay hydrated",
         body: "Time to drink some water.",
       });
     });

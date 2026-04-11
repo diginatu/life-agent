@@ -120,17 +120,15 @@ describe("ActionSelectionSchema", () => {
 describe("DraftMessageSchema", () => {
   test("accepts valid message", () => {
     const result = DraftMessageSchema.parse({
-      title: "Time for a break!",
-      body: "You've been working for a while. Stand up and stretch.",
+      body: "Time for a break! You've been working for a while.",
     });
-    expect(result.title).toBe("Time for a break!");
+    expect(result.body).toContain("break");
   });
 
-  test("rejects empty title", () => {
+  test("rejects empty body", () => {
     expect(() =>
       DraftMessageSchema.parse({
-        title: "",
-        body: "some body",
+        body: "",
       })
     ).toThrow();
   });
@@ -174,10 +172,10 @@ describe("LogEntrySchema", () => {
     const withMessage = {
       ...validEntry,
       decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
-      message: { title: "Break time", body: "Take a walk" },
+      message: { body: "Take a walk — you've been at it a while" },
     };
     const result = LogEntrySchema.parse(withMessage);
-    expect(result.message?.title).toBe("Break time");
+    expect(result.message?.body).toContain("walk");
   });
 
   test("accepts log entry with errors", () => {
