@@ -14,7 +14,7 @@ export interface DiscordClient {
 export interface DiscordAdapter {
   sendMessage(body: string, mentionUserId?: string): Promise<string>;
   sendEmbed(title: string, body: string): Promise<string>;
-  collectReplies(afterMessageId: string): Promise<{ text: string; userId: string; timestamp: string }[]>;
+  collectReplies(afterMessageId: string, allowedUserId?: string): Promise<{ text: string; userId: string; timestamp: string }[]>;
   getLatestMessageId(): Promise<string | null>;
   destroy(): Promise<void>;
 }
@@ -32,17 +32,17 @@ export function createDiscordAdapterFromChannel(channel: DiscordChannel, client:
       return message.id;
     },
 
-    async collectReplies(afterMessageId: string): Promise<{ text: string; userId: string; timestamp: string }[]> {
+    async collectReplies(afterMessageId: string, allowedUserId?: string): Promise<{ text: string; userId: string; timestamp: string }[]> {
       const messages = await channel.messages.fetch({ after: afterMessageId });
       const replies: { text: string; userId: string; timestamp: string }[] = [];
       for (const [, message] of messages) {
-        if (!message.author.bot) {
-          replies.push({
-            text: message.content,
-            userId: message.author.id,
-            timestamp: message.createdAt.toISOString(),
-          });
-        }
+        if (message.author.bot) continue;
+        if (allowedUserId && message.author.id !== allowedUserId) continue;
+        replies.push({
+          text: message.content,
+          userId: message.author.id,
+          timestamp: message.createdAt.toISOString(),
+        });
       }
       return replies;
     },

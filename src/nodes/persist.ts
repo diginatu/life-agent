@@ -41,7 +41,10 @@ export function createPersistNode(deps: PersistNodeDeps) {
           const prevEntry = lastEntries[lastEntries.length - 1] as Record<string, unknown>;
           const prevMsgId = (prevEntry.discordMessageId ?? prevEntry.discordLastSeenMessageId) as string | undefined;
           if (prevMsgId) {
-            const replies = await discord.collectReplies(prevMsgId);
+            const replies = await discord.collectReplies(
+              prevMsgId,
+              actionsConfig.settings.discordMentionUserId || undefined,
+            );
             if (replies.length > 0) {
               feedbackFromPrevious = replies;
             }

@@ -150,6 +150,47 @@ describe("DiscordAdapter", () => {
       expect(replies).toEqual([]);
     });
 
+    test("filters out messages from users other than allowedUserId", async () => {
+      const timestamp = new Date("2024-01-01T12:00:00Z");
+      const messages = new Map<string, MockMessage>([
+        ["msg1", { content: "Allowed user", author: { id: "user1", bot: false }, createdAt: timestamp }],
+        ["msg2", { content: "Other user", author: { id: "user2", bot: false }, createdAt: timestamp }],
+        ["msg3", { content: "Bot", author: { id: "bot1", bot: true }, createdAt: timestamp }],
+      ]);
+
+      const channel = makeChannel({
+        messages: {
+          fetch: async () => messages as Map<string, MockMessage>,
+        },
+      });
+
+      const adapter = createDiscordAdapterFromChannel(channel, makeClient());
+      const replies = await adapter.collectReplies("msg0", "user1");
+
+      expect(replies).toHaveLength(1);
+      expect(replies[0]!.text).toBe("Allowed user");
+      expect(replies[0]!.userId).toBe("user1");
+    });
+
+    test("returns all non-bot messages when allowedUserId is omitted", async () => {
+      const timestamp = new Date("2024-01-01T12:00:00Z");
+      const messages = new Map<string, MockMessage>([
+        ["msg1", { content: "User one", author: { id: "user1", bot: false }, createdAt: timestamp }],
+        ["msg2", { content: "User two", author: { id: "user2", bot: false }, createdAt: timestamp }],
+      ]);
+
+      const channel = makeChannel({
+        messages: {
+          fetch: async () => messages as Map<string, MockMessage>,
+        },
+      });
+
+      const adapter = createDiscordAdapterFromChannel(channel, makeClient());
+      const replies = await adapter.collectReplies("msg0");
+
+      expect(replies).toHaveLength(2);
+    });
+
     test("returns empty array when all messages are from bots", async () => {
       const timestamp = new Date("2024-01-01T12:00:00Z");
       const messages = new Map<string, MockMessage>([

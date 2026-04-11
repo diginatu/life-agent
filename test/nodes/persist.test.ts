@@ -191,6 +191,34 @@ describe("persist node", () => {
     expect(feedback[0]!.text).toBe("ok thanks");
   });
 
+  test("passes discordMentionUserId to collectReplies to restrict replies to that user", async () => {
+    const previousEntries = [
+      { discordMessageId: "prev-msg-id", decision: { action: "nudge_break" } },
+    ];
+    const fsWithPrev = mockFsWithPrevEntries(previousEntries);
+
+    const calls: Array<{ afterId: string; allowedUserId?: string }> = [];
+    const discord: DiscordAdapter = {
+      sendMessage: async () => "discord-msg-1",
+      sendEmbed: async () => "discord-msg-1",
+      collectReplies: async (afterId: string, allowedUserId?: string) => {
+        calls.push({ afterId, allowedUserId });
+        return [];
+      },
+      destroy: async () => {},
+      getLatestMessageId: async () => "latest",
+    };
+
+    const cfg = mockActionsConfig({}, { discordMentionUserId: "user-123" });
+    const node = createPersistNode({ fs: fsWithPrev, config: { logDir: "./logs" }, actionsConfig: cfg, discord });
+
+    await node(baseState);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.afterId).toBe("prev-msg-id");
+    expect(calls[0]!.allowedUserId).toBe("user-123");
+  });
+
   test("collects feedback using discordLastSeenMessageId when no discordMessageId in prev entry", async () => {
     const previousEntries = [
       {
