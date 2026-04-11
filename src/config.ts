@@ -15,6 +15,7 @@ const SettingsSchema = z.object({
   memoryDir: z.string().default("./memory"),
   webPort: z.number().int().positive().default(3000),
   discordChannelId: z.string().default(""),
+  responseStyle: z.string().default("English, friendly and concise"),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;

@@ -142,6 +142,22 @@ describe("message node", () => {
     expect(capturedPrompt).toContain("nudge_break");
   });
 
+  test("injects responseStyle from config into prompt", async () => {
+    const styledConfig = mockActionsConfig({}, { responseStyle: "日本語、優しい口調" });
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validMessageJson;
+      },
+      generateWithImage: async () => validMessageJson,
+    };
+    const node = createMessageNode({ ollama: capturingOllama, actionsConfig: styledConfig });
+    await node(makeState("nudge_break"));
+
+    expect(capturedPrompt).toContain("日本語、優しい口調");
+  });
+
   test("includes action description from config in prompt", async () => {
     let capturedPrompt = "";
     const capturingOllama: OllamaAdapter = {

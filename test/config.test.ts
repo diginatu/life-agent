@@ -84,6 +84,25 @@ describe("loadConfig", () => {
       expect(config.settings.actionDigestDays).toBe(1);
     });
 
+    test("responseStyle defaults to English friendly phrase", () => {
+      const config = loadConfig(MINIMAL_YAML);
+      expect(config.settings.responseStyle).toBe("English, friendly and concise");
+    });
+
+    test("responseStyle is parsed from YAML verbatim", () => {
+      const yaml = `
+settings:
+  responseStyle: "日本語、丁寧で優しい口調"
+actions:
+  none:
+    active: false
+  log_only:
+    active: false
+`;
+      const config = loadConfig(yaml);
+      expect(config.settings.responseStyle).toBe("日本語、丁寧で優しい口調");
+    });
+
     test("rejects invalid ollamaBaseUrl", () => {
       const yaml = `
 settings:

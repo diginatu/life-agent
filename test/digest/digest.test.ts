@@ -445,6 +445,20 @@ describe("generateDigest with previous digests", () => {
     expect(hasNewOrDifferent).toBe(true);
   });
 
+  test("injects responseStyle into prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return "## Summary";
+      },
+      generateWithImage: async () => "",
+    };
+    await generateDigest(sampleEntries, "2026-03-29", capturingOllama, undefined, "French, playful");
+
+    expect(capturedPrompt).toContain("French, playful");
+  });
+
   test("works without previous digests (backward compatible)", async () => {
     const mockOllama: OllamaAdapter = {
       generate: async () => "## Summary",

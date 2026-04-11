@@ -58,7 +58,13 @@ export async function runDigest(config: Config, date: string, deps: DigestDeps =
     fs, config.settings.logDir, date, config.settings.digestContextDays ?? 3,
   );
 
-  const markdown = await generateDigest(entries as Record<string, unknown>[], date, ollama, previousDigests);
+  const markdown = await generateDigest(
+    entries as Record<string, unknown>[],
+    date,
+    ollama,
+    previousDigests,
+    config.settings.responseStyle,
+  );
 
   console.log(markdown);
 

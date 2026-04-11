@@ -24,11 +24,16 @@ const DEFAULT_ACTIONS: Record<string, Record<string, unknown>> = {
 
 export function mockActionsConfig(
   actionOverrides: Record<string, Record<string, unknown>> = {},
+  settingsOverrides: Record<string, unknown> = {},
 ) {
   const actions = { ...DEFAULT_ACTIONS };
   for (const [name, overrides] of Object.entries(actionOverrides)) {
     actions[name] = { ...actions[name], ...overrides };
   }
-  const yaml = yamlStringify({ actions });
+  const doc: Record<string, unknown> = { actions };
+  if (Object.keys(settingsOverrides).length > 0) {
+    doc.settings = settingsOverrides;
+  }
+  const yaml = yamlStringify(doc);
   return loadConfig(yaml);
 }

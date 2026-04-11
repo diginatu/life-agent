@@ -99,7 +99,7 @@ function formatStatsMarkdown(date: string, stats: DayStats): string {
   return lines.join("\n");
 }
 
-function buildDigestPrompt(date: string, stats: DayStats, entries: LogEntry[], previousDigests?: Array<{ date: string; content: string }>): string {
+function buildDigestPrompt(date: string, stats: DayStats, entries: LogEntry[], responseStyle: string, previousDigests?: Array<{ date: string; content: string }>): string {
   const statsSummary = formatStatsMarkdown(date, stats);
   const sampleSize = Math.min(entries.length, 20);
   const sampled = entries.slice(0, sampleSize).map((e) => ({
@@ -120,7 +120,9 @@ function buildDigestPrompt(date: string, stats: DayStats, entries: LogEntry[], p
 
   const hasPreviousContext = previousDigests && previousDigests.length > 0;
 
-  return `You are a personal wellness analyst. Write a concise daily digest in markdown based on the data below.
+  return `Follow this response style: ${responseStyle}.
+
+You are a personal wellness analyst. Write a concise daily digest in markdown based on the data below.
 ${previousDigestSection}
 ## Today's Data — ${date}
 
@@ -151,11 +153,12 @@ export async function generateDigest(
   date: string,
   ollama: OllamaAdapter,
   previousDigests?: Array<{ date: string; content: string }>,
+  responseStyle: string = "English, friendly and concise",
 ): Promise<string> {
   if (entries.length === 0) {
     try {
       return await ollama.generate(
-        `Write a very short markdown note saying no activity was recorded for ${date}. Start with "## No activity".`,
+        `Follow this response style: ${responseStyle}.\n\nWrite a very short markdown note saying no activity was recorded for ${date}. Start with "## No activity".`,
       );
     } catch {
       return `# Daily Digest — ${date}\n\nNo activity recorded for this day.`;
@@ -163,7 +166,7 @@ export async function generateDigest(
   }
 
   const stats = buildStats(entries);
-  const prompt = buildDigestPrompt(date, stats, entries, previousDigests);
+  const prompt = buildDigestPrompt(date, stats, entries, responseStyle, previousDigests);
 
   try {
     return await ollama.generate(prompt);

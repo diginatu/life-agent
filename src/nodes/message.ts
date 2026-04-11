@@ -29,9 +29,11 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-function buildPrompt(summary: SceneSummary, decision: ActionSelection, actionDescription?: string): string {
+function buildPrompt(summary: SceneSummary, decision: ActionSelection, responseStyle: string, actionDescription?: string): string {
   const descLine = actionDescription ? `\n- Action description: ${actionDescription}` : "";
-  return `You are a friendly personal assistant. Draft a short notification message for the user.
+  return `Follow this response style: ${responseStyle}.
+
+You are a friendly personal assistant. Draft a short notification message for the user.
 
 Context:
 - Action: ${decision.action}${descLine}
@@ -88,6 +90,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
     const prompt = buildPrompt(
       state.summary,
       state.decision,
+      actionsConfig.settings.responseStyle,
       actionDescription,
     );
 

@@ -31,6 +31,10 @@ settings:
   # Discord channel ID (set to enable Discord notifications)
   discordChannelId: ""
 
+  # Response style applied to LLM-generated user-visible text (notifications, digest).
+  # Free-form: combine language and tone, e.g. "日本語、丁寧で優しい口調" or "French, playful and encouraging".
+  responseStyle: English, friendly and concise
+
 # Action definitions
 # - active: true = triggers Discord notification; false = log-only
 # - description: seed value for LLM context; evolved at runtime via memory store
