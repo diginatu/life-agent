@@ -36,6 +36,11 @@ async function readFileBase64(path: string): Promise<string> {
   return Buffer.from(buffer).toString("base64");
 }
 
+const PIPELINE_NODE_COUNT = 7;
+function logNodeHeader(name: string, index: number): void {
+  console.log(`\n========== [${index}/${PIPELINE_NODE_COUNT}] ${name} ==========`);
+}
+
 export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   const s = config.settings;
   const ffmpeg = deps.ffmpeg ?? createFfmpegAdapter();
@@ -88,13 +93,34 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   await seedActionDefinitions(store, config);
 
   return new StateGraph(GraphState)
-    .addNode("capture_node", captureNode)
-    .addNode("collect_feedback_node", collectFeedbackNode)
-    .addNode("summarize_node", summarizeNode)
-    .addNode("action_node", actionNode)
-    .addNode("message_node", messageNode)
-    .addNode("persist_node", persistNode)
-    .addNode("extract_memories_node", extractMemoriesNode)
+    .addNode("capture_node", async (state) => {
+      logNodeHeader("capture_node", 1);
+      return captureNode(state);
+    })
+    .addNode("collect_feedback_node", async () => {
+      logNodeHeader("collect_feedback_node", 2);
+      return collectFeedbackNode();
+    })
+    .addNode("summarize_node", async (state) => {
+      logNodeHeader("summarize_node", 3);
+      return summarizeNode(state);
+    })
+    .addNode("action_node", async (state, config) => {
+      logNodeHeader("action_node", 4);
+      return actionNode(state, config);
+    })
+    .addNode("message_node", async (state) => {
+      logNodeHeader("message_node", 5);
+      return messageNode(state);
+    })
+    .addNode("persist_node", async (state) => {
+      logNodeHeader("persist_node", 6);
+      return persistNode(state);
+    })
+    .addNode("extract_memories_node", async (state, config) => {
+      logNodeHeader("extract_memories_node", 7);
+      return extractMemoriesNode(state, config);
+    })
     .addEdge(START, "capture_node")
     .addEdge("capture_node", "collect_feedback_node")
     .addEdge("collect_feedback_node", "summarize_node")

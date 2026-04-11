@@ -120,6 +120,36 @@ describe("buildGraph (full pipeline)", () => {
     expect(result.errors.some((e: string) => e.includes("ollama"))).toBe(true);
   });
 
+  test("logs a header separator before each of the 7 pipeline nodes", async () => {
+    const logs: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
+    };
+    try {
+      const graph = await buildGraph(config, allMocks());
+      await graph.invoke({});
+    } finally {
+      console.log = original;
+    }
+
+    const nodeOrder = [
+      "capture_node",
+      "collect_feedback_node",
+      "summarize_node",
+      "action_node",
+      "message_node",
+      "persist_node",
+      "extract_memories_node",
+    ];
+    const headers = logs.filter((line) => /==========.*==========/.test(line));
+    expect(headers.length).toBe(7);
+    nodeOrder.forEach((name, i) => {
+      expect(headers[i]).toContain(name);
+      expect(headers[i]).toContain(`[${i + 1}/7]`);
+    });
+  });
+
   test("none action: no message drafted, no notification", async () => {
     const noneAction = JSON.stringify({
       action: "none",
