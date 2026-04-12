@@ -102,9 +102,9 @@ ${actionDescriptions}
 
 You MUST choose an action from the available actions list above. Return a JSON object with exactly these fields:
 {
-  "action": one of ${JSON.stringify(allActions)},
-  "priority": "low" | "medium" | "high",
   "reason": string explaining your choice
+  "priority": "low" | "medium" | "high",
+  "action": one of ${JSON.stringify(allActions)},
 }
 
 Return ONLY the JSON object, no other text.`;
