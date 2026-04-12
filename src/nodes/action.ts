@@ -99,7 +99,7 @@ Current time:
 ${memoriesSection}${historySections}
 Available actions:
 ${actionDescriptions}
-
+${!userFeedback || userFeedback.length === 0 ? "\nIMPORTANT: There are no new user messages in this cycle. Do NOT just \"reply\"" : ""}
 You MUST choose an action from the available actions list above. Return a JSON object with exactly these fields:
 {
   "reason": string explaining your choice
@@ -127,7 +127,7 @@ export function createActionNode(deps: ActionNodeDeps) {
     if (deps.fs && deps.logDir) {
       const dateStr = currentTime.toISOString().slice(0, 10);
       try {
-        logEntries = await deps.fs.readLastNLines(deps.logDir, dateStr, deps.historyCount ?? 10) as LogEntry[];
+        logEntries = await deps.fs.readLastNLinesAcrossDays(deps.logDir, dateStr, deps.historyCount ?? 10) as LogEntry[];
       } catch {
         // History is best-effort; continue without it
       }

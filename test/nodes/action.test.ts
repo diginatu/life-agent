@@ -13,6 +13,7 @@ function mockFs(entries: unknown[] = []): FilesystemAdapter {
   return {
     appendJsonLine: async () => { },
     readLastNLines: async () => entries,
+    readLastNLinesAcrossDays: async () => entries,
   };
 }
 
@@ -20,6 +21,7 @@ function errorFs(): FilesystemAdapter {
   return {
     appendJsonLine: async () => { },
     readLastNLines: async () => { throw new Error("fs read error"); },
+    readLastNLinesAcrossDays: async () => { throw new Error("fs read error"); },
   };
 }
 
@@ -289,6 +291,11 @@ describe("action node with history", () => {
         if (callCount === 1) firstN = n;
         return historyEntries;
       },
+      readLastNLinesAcrossDays: async (_dir, _date, n) => {
+        callCount++;
+        if (callCount === 1) firstN = n;
+        return historyEntries;
+      },
     };
     const node = createActionNode({
       ollama: mockOllama(),
@@ -323,6 +330,7 @@ describe("action node with history", () => {
     const dateFs: FilesystemAdapter = {
       appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => dayDigests[date] ?? [],
+      readLastNLinesAcrossDays: async (_dir, date) => dayDigests[date] ?? [],
     };
     const node = createActionNode({
       ollama: capturingOllama,
@@ -362,6 +370,56 @@ describe("action node with history", () => {
     expect(capturedPrompt).not.toContain("Previous digests");
     expect(capturedPrompt).not.toContain("Yesterday was a productive day");
     expect(capturedPrompt).toContain("Recent history");
+  });
+
+  test("includes sent message body in history", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const entriesWithMessage = [
+      {
+        ...historyEntries[0],
+        decision: { action: "nudge_break", priority: "medium", reason: "long session" },
+        message: { body: "Time for a stretch! You've been coding for a while." },
+      },
+      historyEntries[1],
+    ];
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFs(entriesWithMessage),
+      logDir: "./logs",
+      now: () => new Date("2026-03-31T11:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("Time for a stretch! You've been coding for a while.");
+  });
+
+  test("does not show sent message line for entries with no message", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFs(historyEntries),
+      logDir: "./logs",
+      now: () => new Date("2026-03-31T11:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).not.toContain("agent message:");
   });
 
   test("includes user feedback from previous Discord message in history", async () => {
@@ -441,6 +499,46 @@ describe("action node with history", () => {
     await node(makeState({ userFeedback: [] }));
 
     expect(capturedPrompt).not.toContain("Latest user reply");
+  });
+
+  test("prompt warns not to reply when there is no new user feedback", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const replyConfig = mockActionsConfig({
+      reply: { active: true, description: "Reply to the user feedback", fallback: { body: "fallback" } },
+    });
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig: replyConfig });
+    await node(makeState({ userFeedback: [] }));
+
+    expect(capturedPrompt).toContain("reply");
+    expect(capturedPrompt).toMatch(/no new user messages/i);
+  });
+
+  test("prompt does not warn about reply when there IS new user feedback", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const replyConfig = mockActionsConfig({
+      reply: { active: true, description: "Reply to the user feedback", fallback: { body: "fallback" } },
+    });
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig: replyConfig });
+    await node(makeState({
+      userFeedback: [{ text: "hello", userId: "u1", timestamp: "2026-03-31T10:00:00.000Z" }],
+    }));
+
+    expect(capturedPrompt).toContain("Latest user reply");
+    expect(capturedPrompt).not.toMatch(/no new user messages/i);
   });
 
   test("works without fs deps (backward compatible)", async () => {

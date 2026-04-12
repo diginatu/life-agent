@@ -7,6 +7,7 @@ export interface LogEntry {
   timestamp?: string;
   summary?: { activityGuess?: string | null; posture?: string;[key: string]: unknown };
   decision?: { action?: string; reason?: string;[key: string]: unknown };
+  message?: { body?: string } | null;
   feedbackFromPrevious?: { text: string; userId: string; timestamp: string }[];
   tags?: string[];
   content?: string;
@@ -43,6 +44,9 @@ export function formatHistory(entries: LogEntry[], digestInfos?: DigestInfo[]): 
     const action = e.decision?.action ?? "unknown";
     const reason = e.decision?.reason ?? "";
     let line = `  ${time} | ${posture}, ${activity} → ${action}${reason ? ` (${reason})` : ""}`;
+    if (e.message?.body) {
+      line += `\n    agent message: ${e.message.body}`;
+    }
     if (e.feedbackFromPrevious && e.feedbackFromPrevious.length > 0) {
       const replies = e.feedbackFromPrevious.map((f) => f.text).join("; ");
       line += `\n    user reply: ${replies}`;
