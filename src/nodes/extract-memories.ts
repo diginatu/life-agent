@@ -90,7 +90,7 @@ ${historySection}${feedbackSection}
 - Use kebab-case keys (e.g., "sleep-late", "takes-bath-before-bed", "codes-at-night")
 - Categories: "sleep", "activity", "routine", "preference", "wellness"
 - Only include patterns you are reasonably confident about
-- If user feedback (latest reply or prior replies in history) suggests an action definition should be refined, include an actionUpdate
+- If user feedback (latest reply or prior replies in history) suggests an action definition should be added or refined, include an actionUpdate
 
 Return a JSON object (no markdown wrapping):
 {
@@ -131,9 +131,9 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
 
     const logEntriesPromise: Promise<LogEntry[] | undefined> = deps.fs && deps.logDir
       ? deps.fs
-          .readLastNLines(deps.logDir, currentTime.toISOString().slice(0, 10), deps.historyCount ?? 10)
-          .then((entries) => entries as LogEntry[])
-          .catch(() => undefined)
+        .readLastNLines(deps.logDir, currentTime.toISOString().slice(0, 10), deps.historyCount ?? 10)
+        .then((entries) => entries as LogEntry[])
+        .catch(() => undefined)
       : Promise.resolve(undefined);
 
     try {
