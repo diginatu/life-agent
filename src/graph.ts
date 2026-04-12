@@ -70,6 +70,9 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   const summarizeNode = createSummarizeNode({
     ollama,
     readFileBase64: deps.readFileBase64 ?? readFileBase64,
+    fs,
+    logDir: s.logDir,
+    now: deps.now,
   });
 
   const collectFeedbackNode = createCollectFeedbackNode({

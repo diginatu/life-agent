@@ -3,7 +3,7 @@ import { HumanMessage } from "@langchain/core/messages";
 
 export interface OllamaAdapter {
   generate(prompt: string): Promise<string>;
-  generateWithImage(prompt: string, imageBase64: string): Promise<string>;
+  generateWithImage(prompt: string, imageBase64: string | string[]): Promise<string>;
 }
 
 export interface LlmInvoker {
@@ -33,14 +33,15 @@ export function createOllamaAdapter(invoker: LlmInvoker): OllamaAdapter {
     },
 
     async generateWithImage(prompt, imageBase64) {
-      console.log(`[LLM prompt] (with image)\n${prompt}`);
+      const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
+      console.log(`[LLM prompt] (with ${images.length} image${images.length === 1 ? "" : "s"})\n${prompt}`);
       const message = new HumanMessage({
         content: [
           { type: "text", text: prompt },
-          {
-            type: "image_url",
-            image_url: `data:image/jpeg;base64,${imageBase64}`,
-          },
+          ...images.map((b64) => ({
+            type: "image_url" as const,
+            image_url: `data:image/jpeg;base64,${b64}`,
+          })),
         ],
       });
       const response = await invoker.invoke([message]);
