@@ -4,6 +4,7 @@ import { mkdir } from "node:fs/promises";
 export interface FilesystemAdapter {
   appendJsonLine(dir: string, date: string, data: unknown): Promise<void>;
   readLastNLines(dir: string, date: string, n: number): Promise<unknown[]>;
+  readLastNLinesAcrossDays(dir: string, date: string, n: number, maxDaysBack?: number): Promise<unknown[]>;
 }
 
 export function createFilesystemAdapter(): FilesystemAdapter {
@@ -32,6 +33,21 @@ export function createFilesystemAdapter(): FilesystemAdapter {
 
       const lastN = lines.slice(-n);
       return lastN.map((line) => JSON.parse(line));
+    },
+
+    async readLastNLinesAcrossDays(dir, date, n, maxDaysBack = 1) {
+      const collected: unknown[] = [];
+      const startDate = new Date(date + "T00:00:00.000Z");
+
+      for (let i = 0; i <= maxDaysBack && collected.length < n; i++) {
+        const d = new Date(startDate);
+        d.setUTCDate(d.getUTCDate() - i);
+        const dateStr = d.toISOString().slice(0, 10);
+        const entries = await this.readLastNLines(dir, dateStr, n - collected.length);
+        collected.unshift(...entries);
+      }
+
+      return collected.slice(-n);
     },
   };
 }

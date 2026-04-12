@@ -375,6 +375,21 @@ describe("extract_memories action definition evolution", () => {
           ],
         },
       ],
+      readLastNLinesAcrossDays: async () => [
+        {
+          timestamp: "2026-04-12T09:30:00.000Z",
+          summary: { posture: "sitting", activityGuess: "coding" },
+          decision: { action: "nudge_break", reason: "2h since last break" },
+        },
+        {
+          timestamp: "2026-04-12T09:45:00.000Z",
+          summary: { posture: "standing", activityGuess: "stretching" },
+          decision: { action: "none", reason: "good activity" },
+          feedbackFromPrevious: [
+            { text: "thanks for the reminder", userId: "u1", timestamp: "2026-04-12T09:40:00.000Z" },
+          ],
+        },
+      ],
     };
 
     const node = createExtractMemoriesNode({
@@ -402,6 +417,7 @@ describe("extract_memories action definition evolution", () => {
     const fs = {
       appendJsonLine: async () => {},
       readLastNLines: async () => { throw new Error("disk gone"); },
+      readLastNLinesAcrossDays: async () => { throw new Error("disk gone"); },
     };
 
     const node = createExtractMemoriesNode({

@@ -23,7 +23,7 @@ export function createCollectFeedbackNode(deps: CollectFeedbackDeps) {
 
     try {
       const dateStr = now().toISOString().slice(0, 10);
-      const lastEntries = await fs.readLastNLines(logDir, dateStr, 1);
+      const lastEntries = await fs.readLastNLinesAcrossDays(logDir, dateStr, 1);
       if (lastEntries.length === 0) return {};
 
       const prevEntry = lastEntries[lastEntries.length - 1] as Record<string, unknown>;

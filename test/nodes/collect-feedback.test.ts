@@ -10,6 +10,7 @@ function mockFs(entries: unknown[] = []): FilesystemAdapter {
   return {
     appendJsonLine: async () => {},
     readLastNLines: async () => entries,
+    readLastNLinesAcrossDays: async () => entries,
   };
 }
 
@@ -150,6 +151,36 @@ describe("collect-feedback node", () => {
     const result = await node();
 
     expect(result.userFeedback).toBeUndefined();
+  });
+
+  test("uses readLastNLinesAcrossDays to find previous entry across day boundary", async () => {
+    const replies = [
+      { text: "reply from yesterday", userId: "u1", timestamp: "2026-04-11T23:58:00.000Z" },
+    ];
+    let calledMethod = "";
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => {
+        calledMethod = "readLastNLines";
+        return [];
+      },
+      readLastNLinesAcrossDays: async () => {
+        calledMethod = "readLastNLinesAcrossDays";
+        return [{ discordMessageId: "msg-from-yesterday" }];
+      },
+    };
+    const node = createCollectFeedbackNode({
+      fs,
+      logDir: "./logs",
+      actionsConfig,
+      discord: mockDiscord(replies),
+      now: () => new Date("2026-04-12T00:05:00.000Z"),
+    });
+
+    const result = await node();
+
+    expect(calledMethod).toBe("readLastNLinesAcrossDays");
+    expect(result.userFeedback).toEqual(replies);
   });
 
   test("returns empty update when prior entry has no cursor", async () => {

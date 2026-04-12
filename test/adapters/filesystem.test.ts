@@ -62,6 +62,65 @@ describe("FilesystemAdapter", () => {
     });
   });
 
+  describe("readLastNLinesAcrossDays", () => {
+    test("returns entries from today when today has enough", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-03-29", { i: 1 });
+      await adapter.appendJsonLine(dir, "2026-03-29", { i: 2 });
+      await adapter.appendJsonLine(dir, "2026-03-29", { i: 3 });
+
+      const result = await adapter.readLastNLinesAcrossDays(dir, "2026-03-29", 2);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ i: 2 });
+      expect(result[1]).toEqual({ i: 3 });
+    });
+
+    test("falls back to yesterday when today is empty", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-03-28", { i: 1 });
+
+      const result = await adapter.readLastNLinesAcrossDays(dir, "2026-03-29", 1);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({ i: 1 });
+    });
+
+    test("combines entries across two days in chronological order", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-03-28", { i: 1 });
+      await adapter.appendJsonLine(dir, "2026-03-28", { i: 2 });
+      await adapter.appendJsonLine(dir, "2026-03-29", { i: 3 });
+
+      const result = await adapter.readLastNLinesAcrossDays(dir, "2026-03-29", 3);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ i: 1 });
+      expect(result[1]).toEqual({ i: 2 });
+      expect(result[2]).toEqual({ i: 3 });
+    });
+
+    test("respects maxDaysBack=0 (only reads today)", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-03-28", { i: 1 });
+
+      const result = await adapter.readLastNLinesAcrossDays(dir, "2026-03-29", 1, 0);
+      expect(result).toEqual([]);
+    });
+
+    test("returns empty when no files exist in range", async () => {
+      const adapter = createFilesystemAdapter();
+
+      const result = await adapter.readLastNLinesAcrossDays(dir, "2026-03-29", 5);
+      expect(result).toEqual([]);
+    });
+
+    test("does not go beyond maxDaysBack", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-03-27", { i: 1 });
+
+      const result = await adapter.readLastNLinesAcrossDays(dir, "2026-03-29", 1, 1);
+      expect(result).toEqual([]);
+    });
+  });
+
   describe("readLastNLines", () => {
     test("returns empty array for non-existent file", async () => {
       const adapter = createFilesystemAdapter();

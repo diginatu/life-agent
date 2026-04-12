@@ -49,6 +49,7 @@ export function createDryRunDeps() {
       console.log(`[dry-run] Would write log entry: ${JSON.stringify(data).slice(0, 100)}...`);
     },
     readLastNLines: async () => [],
+    readLastNLinesAcrossDays: async () => [],
   };
 
   const discord: DiscordAdapter = {

@@ -156,6 +156,7 @@ describe("runDigest with Discord", () => {
     return {
       appendJsonLine: async () => { },
       readLastNLines: async () => sampleEntries,
+      readLastNLinesAcrossDays: async () => sampleEntries,
     };
   }
 
@@ -200,6 +201,7 @@ describe("runDigest with Discord", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async (_dir, _date, data) => { written.push(data); },
       readLastNLines: async () => sampleEntries,
+      readLastNLinesAcrossDays: async () => sampleEntries,
     };
     await runDigest(config, "2026-03-29", { fs, ollama: mockOllama() });
 
@@ -221,6 +223,9 @@ describe("shouldRunDigest", () => {
       readLastNLines: async () => [
         { timestamp: "2026-03-31T09:00:00.000Z", tags: [], decision: { action: "none" } },
       ],
+      readLastNLinesAcrossDays: async () => [
+        { timestamp: "2026-03-31T09:00:00.000Z", tags: [], decision: { action: "none" } },
+      ],
     };
     expect(await shouldRunDigest(fs, "./logs", now)).toBe(true);
   });
@@ -229,6 +234,9 @@ describe("shouldRunDigest", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async () => { },
       readLastNLines: async () => [
+        { timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30" },
+      ],
+      readLastNLinesAcrossDays: async () => [
         { timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30" },
       ],
     };
@@ -241,6 +249,9 @@ describe("shouldRunDigest", () => {
       readLastNLines: async () => [
         { timestamp: "2026-03-30T09:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29" },
       ],
+      readLastNLinesAcrossDays: async () => [
+        { timestamp: "2026-03-30T09:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29" },
+      ],
     };
     expect(await shouldRunDigest(fs, "./logs", now)).toBe(true);
   });
@@ -249,6 +260,7 @@ describe("shouldRunDigest", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async () => { },
       readLastNLines: async () => [],
+      readLastNLinesAcrossDays: async () => [],
     };
     expect(await shouldRunDigest(fs, "./logs", now)).toBe(true);
   });
@@ -260,6 +272,7 @@ describe("writeDigestMarker", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async (_dir, _date, data) => { written.push(data); },
       readLastNLines: async () => [],
+      readLastNLinesAcrossDays: async () => [],
     };
     const now = new Date("2026-03-31T10:00:00.000Z");
     await writeDigestMarker(fs, "./logs", "2026-03-30", now);
@@ -277,6 +290,7 @@ describe("writeDigestMarker", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async (_dir, _date, data) => { written.push(data); },
       readLastNLines: async () => [],
+      readLastNLinesAcrossDays: async () => [],
     };
     const now = new Date("2026-03-31T10:00:00.000Z");
     const content = "## Daily Summary\n\nA productive day.";
@@ -296,6 +310,7 @@ describe("runDigest persists digest content", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async (_dir, _date, data) => { written.push(data); },
       readLastNLines: async () => sampleEntries,
+      readLastNLinesAcrossDays: async () => sampleEntries,
     };
     const ollama: OllamaAdapter = {
       generate: async () => digestMarkdown,
@@ -317,6 +332,7 @@ describe("collectPreviousDigests", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async () => { },
       readLastNLines: async () => sampleEntries,
+      readLastNLinesAcrossDays: async () => sampleEntries,
     };
     const result = await collectPreviousDigests(fs, "./logs", "2026-03-31", 3);
     expect(result).toEqual([]);
@@ -326,6 +342,15 @@ describe("collectPreviousDigests", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => {
+        if (date === "2026-03-31") {
+          return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }];
+        }
+        if (date === "2026-03-30") {
+          return [{ timestamp: "2026-03-30T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29 digest" }];
+        }
+        return [];
+      },
+      readLastNLinesAcrossDays: async (_dir, date) => {
         if (date === "2026-03-31") {
           return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }];
         }
@@ -350,6 +375,12 @@ describe("collectPreviousDigests", () => {
         }
         return [];
       },
+      readLastNLinesAcrossDays: async (_dir, date) => {
+        if (date === "2026-03-31") {
+          return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-31", content: "## March 31 digest" }];
+        }
+        return [];
+      },
     };
     const result = await collectPreviousDigests(fs, "./logs", "2026-03-31", 3);
     expect(result).toEqual([]);
@@ -359,6 +390,15 @@ describe("collectPreviousDigests", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => {
+        if (date === "2026-03-31") {
+          return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29 digest (copy 1)" }];
+        }
+        if (date === "2026-03-30") {
+          return [{ timestamp: "2026-03-30T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29 digest (copy 2)" }];
+        }
+        return [];
+      },
+      readLastNLinesAcrossDays: async (_dir, date) => {
         if (date === "2026-03-31") {
           return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29 digest (copy 1)" }];
         }
@@ -386,6 +426,16 @@ describe("collectPreviousDigests", () => {
         };
         return digestsByDate[date] ?? [];
       },
+      readLastNLinesAcrossDays: async (_dir, date) => {
+        const digestsByDate: Record<string, unknown[]> = {
+          "2026-03-31": [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }],
+          "2026-03-30": [{ timestamp: "2026-03-30T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29 digest" }],
+          "2026-03-29": [{ timestamp: "2026-03-29T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-28", content: "## March 28 digest" }],
+          "2026-03-28": [{ timestamp: "2026-03-28T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-27", content: "## March 27 digest" }],
+          "2026-03-27": [{ timestamp: "2026-03-27T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-26", content: "## March 26 digest" }],
+        };
+        return digestsByDate[date] ?? [];
+      },
     };
     const result = await collectPreviousDigests(fs, "./logs", "2026-03-31", 2);
     // Only the 2-day window before 2026-03-31 should be included (2026-03-30 and 2026-03-29)
@@ -398,6 +448,15 @@ describe("collectPreviousDigests", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => {
+        if (date === "2026-03-31") {
+          return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }];
+        }
+        if (date === "2026-03-30") {
+          throw new Error("read error");
+        }
+        return [];
+      },
+      readLastNLinesAcrossDays: async (_dir, date) => {
         if (date === "2026-03-31") {
           return [{ timestamp: "2026-03-31T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30 digest" }];
         }
@@ -466,6 +525,16 @@ describe("runDigest collects previous digests", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async () => { },
       readLastNLines: async (_dir, date) => {
+        datesRead.push(date as string);
+        if (date === "2026-03-29") {
+          return sampleEntries;
+        }
+        if (date === "2026-03-28") {
+          return [{ timestamp: "2026-03-28T08:00:00.000Z", tags: ["digest"], digestDate: "2026-03-27", content: "## March 27 digest" }];
+        }
+        return [];
+      },
+      readLastNLinesAcrossDays: async (_dir, date) => {
         datesRead.push(date as string);
         if (date === "2026-03-29") {
           return sampleEntries;

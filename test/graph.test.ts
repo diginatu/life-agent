@@ -56,6 +56,7 @@ function mockFs(lastEntries: unknown[] = []): FilesystemAdapter {
   return {
     appendJsonLine: async () => {},
     readLastNLines: async () => lastEntries,
+    readLastNLinesAcrossDays: async () => lastEntries,
   };
 }
 

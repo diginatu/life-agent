@@ -38,6 +38,7 @@ function emptyFs(): FilesystemAdapter {
   return {
     appendJsonLine: async () => {},
     readLastNLines: async () => [],
+    readLastNLinesAcrossDays: async () => [],
   };
 }
 
@@ -152,6 +153,9 @@ describe("summarize node", () => {
       readLastNLines: async () => [
         { capture: { imagePath: "/tmp/prev.jpg" } },
       ],
+      readLastNLinesAcrossDays: async () => [
+        { capture: { imagePath: "/tmp/prev.jpg" } },
+      ],
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -193,6 +197,9 @@ describe("summarize node", () => {
       readLastNLines: async () => [
         { capture: { imagePath: "/tmp/gone.jpg" } },
       ],
+      readLastNLinesAcrossDays: async () => [
+        { capture: { imagePath: "/tmp/gone.jpg" } },
+      ],
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -212,6 +219,7 @@ describe("summarize node", () => {
     const fs: FilesystemAdapter = {
       appendJsonLine: async () => {},
       readLastNLines: async () => { throw new Error("disk error"); },
+      readLastNLinesAcrossDays: async () => { throw new Error("disk error"); },
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -224,5 +232,128 @@ describe("summarize node", () => {
     expect(result.summary).toBeDefined();
     expect(result.errors).toBeUndefined();
     expect(rec.calls[0]!.image).toEqual(["b64:/tmp/test.jpg"]);
+  });
+
+  test("includes previous summary text in prompt when previous log entry has summary", async () => {
+    const rec = recordingOllama(validSummaryJson);
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => [
+        {
+          capture: { imagePath: "/tmp/prev.jpg" },
+          summary: {
+            personPresent: true,
+            posture: "sitting",
+            scene: "desk with monitor",
+            activityGuess: "coding",
+            confidence: 0.85,
+          },
+        },
+      ],
+      readLastNLinesAcrossDays: async () => [
+        {
+          capture: { imagePath: "/tmp/prev.jpg" },
+          summary: {
+            personPresent: true,
+            posture: "sitting",
+            scene: "desk with monitor",
+            activityGuess: "coding",
+            confidence: 0.85,
+          },
+        },
+      ],
+    };
+    const node = createSummarizeNode({
+      ...baseDeps,
+      fs,
+      ollama: rec.ollama,
+      readFileBase64: async (p) => `b64:${p}`,
+      fileExists: async () => true,
+    });
+
+    const result = await node(captureState);
+    expect(result.summary).toBeDefined();
+    expect(rec.calls).toHaveLength(1);
+    const prompt = rec.calls[0]!.prompt;
+    expect(prompt).toContain("desk with monitor");
+    expect(prompt).toContain("coding");
+    expect(prompt).toContain("sitting");
+  });
+
+  test("omits previous summary from prompt when previous log entry has no summary", async () => {
+    const rec = recordingOllama(validSummaryJson);
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => [
+        { capture: { imagePath: "/tmp/prev.jpg" } },
+      ],
+      readLastNLinesAcrossDays: async () => [
+        { capture: { imagePath: "/tmp/prev.jpg" } },
+      ],
+    };
+    const node = createSummarizeNode({
+      ...baseDeps,
+      fs,
+      ollama: rec.ollama,
+      readFileBase64: async (p) => `b64:${p}`,
+      fileExists: async () => true,
+    });
+
+    const result = await node(captureState);
+    expect(result.summary).toBeDefined();
+    expect(rec.calls).toHaveLength(1);
+    const prompt = rec.calls[0]!.prompt;
+    expect(prompt).toContain("TWO webcam images");
+    expect(prompt).not.toContain("Previous analysis");
+  });
+
+  test("includes previous summary even when previous capture image is missing", async () => {
+    const rec = recordingOllama(validSummaryJson);
+    const fs: FilesystemAdapter = {
+      appendJsonLine: async () => {},
+      readLastNLines: async () => [
+        {
+          capture: { imagePath: "/tmp/pruned.jpg" },
+          summary: {
+            personPresent: true,
+            posture: "slouching",
+            scene: "bedroom desk",
+            activityGuess: "reading",
+            confidence: 0.9,
+          },
+        },
+      ],
+      readLastNLinesAcrossDays: async () => [
+        {
+          capture: { imagePath: "/tmp/pruned.jpg" },
+          summary: {
+            personPresent: true,
+            posture: "slouching",
+            scene: "bedroom desk",
+            activityGuess: "reading",
+            confidence: 0.9,
+          },
+        },
+      ],
+    };
+    const node = createSummarizeNode({
+      ...baseDeps,
+      fs,
+      ollama: rec.ollama,
+      readFileBase64: async (p) => `b64:${p}`,
+      fileExists: async () => false,
+    });
+
+    const result = await node(captureState);
+    expect(result.summary).toBeDefined();
+    expect(rec.calls).toHaveLength(1);
+    // image was pruned, so falls back to single image
+    expect(rec.calls[0]!.image).toEqual(["b64:/tmp/test.jpg"]);
+    // but previous summary text should still appear in the prompt
+    const prompt = rec.calls[0]!.prompt;
+    expect(prompt).toContain("Previous analysis");
+    expect(prompt).toContain("bedroom desk");
+    expect(prompt).toContain("reading");
+    expect(prompt).toContain("slouching");
   });
 });
