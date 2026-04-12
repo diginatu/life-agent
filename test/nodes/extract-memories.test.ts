@@ -222,7 +222,7 @@ describe("extract_memories action definition evolution", () => {
     const store = new InMemoryStore();
     await store.put(["actions", "definitions"], "nudge_break", {
       description: "Suggest the user take a short break",
-      source: "seed",
+      source: "learned",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
 
@@ -243,6 +243,34 @@ describe("extract_memories action definition evolution", () => {
     expect(item).not.toBeNull();
     expect(item!.value.description).toBe("Suggest break after 2h of focused coding — user responds well to this");
     expect(item!.value.source).toBe("learned");
+  });
+
+  test("does not overwrite seed-sourced action definitions", async () => {
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_break", {
+      description: "Suggest the user take a short break",
+      source: "seed",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const ollama: OllamaAdapter = {
+      generate: async () => JSON.stringify({
+        patterns: [],
+        actionUpdates: [
+          { key: "nudge_break", description: "LLM-proposed override that should be ignored" },
+        ],
+      }),
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(makeState(), makeConfig(store));
+
+    const item = await store.get(["actions", "definitions"], "nudge_break");
+    expect(item).not.toBeNull();
+    expect(item!.value.description).toBe("Suggest the user take a short break");
+    expect(item!.value.source).toBe("seed");
+    expect(item!.value.updatedAt).toBe("2026-01-01T00:00:00.000Z");
   });
 
   test("leaves action definitions unchanged when actionUpdates is empty", async () => {
@@ -390,7 +418,7 @@ describe("extract_memories action definition evolution", () => {
     const store = new InMemoryStore();
     await store.put(["actions", "definitions"], "nudge_sleep", {
       description: "Suggest sleep",
-      source: "seed",
+      source: "learned",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
 

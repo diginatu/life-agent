@@ -199,15 +199,17 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
         if (!update.key || !update.description) continue;
 
         const existing = await store.get(ACTION_DEFS_NAMESPACE, update.key);
-        if (existing) {
-          const record: ActionDefinitionRecord = {
-            ...(existing.value as ActionDefinitionRecord),
-            description: update.description,
-            source: "learned",
-            updatedAt: now,
-          };
-          await store.put(ACTION_DEFS_NAMESPACE, update.key, record);
-        }
+        if (!existing) continue;
+        const current = existing.value as ActionDefinitionRecord;
+        if (current.source === "seed") continue;
+
+        const record: ActionDefinitionRecord = {
+          ...current,
+          description: update.description,
+          source: "learned",
+          updatedAt: now,
+        };
+        await store.put(ACTION_DEFS_NAMESPACE, update.key, record);
       }
     } catch {
       // best-effort
