@@ -2,12 +2,12 @@ import { ChatOllama } from "@langchain/ollama";
 import { HumanMessage } from "@langchain/core/messages";
 
 export interface OllamaAdapter {
-  generate(prompt: string): Promise<string>;
+  generate(prompt: string, options?: { format?: Record<string, unknown> }): Promise<string>;
   generateWithImage(prompt: string, imageBase64: string | string[]): Promise<string>;
 }
 
 export interface LlmInvoker {
-  invoke(messages: unknown[]): Promise<{ content: unknown }>;
+  invoke(messages: unknown[], options?: Record<string, unknown>): Promise<{ content: unknown }>;
 }
 
 export function createOllamaAdapterFromConfig(config: {
@@ -23,10 +23,10 @@ export function createOllamaAdapterFromConfig(config: {
 
 export function createOllamaAdapter(invoker: LlmInvoker): OllamaAdapter {
   return {
-    async generate(prompt) {
+    async generate(prompt, options) {
       console.log(`[LLM prompt]\n${prompt}`);
       const message = new HumanMessage({ content: prompt });
-      const response = await invoker.invoke([message]);
+      const response = await invoker.invoke([message], options?.format ? { format: options.format } : undefined);
       const result = String(response.content);
       console.log(`[LLM response]\n${result}`);
       return result;

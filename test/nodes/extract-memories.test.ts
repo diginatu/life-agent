@@ -184,6 +184,28 @@ describe("extract_memories node", () => {
     expect(capturedPrompt).toContain("standing");
   });
 
+  test("passes structured output format to ollama.generate", async () => {
+    const store = new InMemoryStore();
+    let capturedOptions: { format?: Record<string, unknown> } | undefined;
+    const ollama: OllamaAdapter = {
+      generate: async (_prompt, options) => {
+        capturedOptions = options;
+        return JSON.stringify({ patterns: [], actionUpdates: [] });
+      },
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(makeState(), makeConfig(store));
+
+    expect(capturedOptions).toBeDefined();
+    expect(capturedOptions!.format).toBeDefined();
+    // Verify the schema has the expected structure
+    const format = capturedOptions!.format as Record<string, unknown>;
+    expect((format as any).properties).toHaveProperty("patterns");
+    expect((format as any).properties).toHaveProperty("actionUpdates");
+  });
+
   test("skips extraction when no summary in state", async () => {
     const store = new InMemoryStore();
     let called = false;
@@ -322,6 +344,32 @@ describe("extract_memories action definition evolution", () => {
     expect(capturedPrompt).toContain("Suggest the user take a short break");
   });
 
+  test("truncates long action description in extraction prompt", async () => {
+    const longDesc = "B".repeat(200) + "_TAIL_MARKER";
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_break", {
+      description: longDesc,
+      source: "learned",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    let capturedPrompt = "";
+    const ollama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        capturedPrompt = prompt;
+        return JSON.stringify({ patterns: [], actionUpdates: [] });
+      },
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(makeState(), makeConfig(store));
+
+    expect(capturedPrompt).not.toContain("_TAIL_MARKER");
+    expect(capturedPrompt).toContain("…");
+    expect(capturedPrompt).toContain("B".repeat(100));
+  });
+
   test("includes user feedback from state in LLM prompt", async () => {
     const store = new InMemoryStore();
     let capturedPrompt = "";
@@ -428,6 +476,50 @@ describe("extract_memories action definition evolution", () => {
     const result = await node(makeState(), makeConfig(store));
 
     expect(result.errors).toBeUndefined();
+  });
+
+  test("creates new action definition in store when LLM suggests a novel action key", async () => {
+    const store = new InMemoryStore();
+    // No "nudge_bath" entry — store is empty for that key
+
+    const ollama: OllamaAdapter = {
+      generate: async () => JSON.stringify({
+        patterns: [],
+        actionUpdates: [
+          { key: "nudge_bath", description: "Remind user to take a bath before bed" },
+        ],
+      }),
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(makeState(), makeConfig(store));
+
+    const item = await store.get(["actions", "definitions"], "nudge_bath");
+    expect(item).not.toBeNull();
+    expect(item!.value.description).toBe("Remind user to take a bath before bed");
+    expect(item!.value.source).toBe("learned");
+  });
+
+  test("does not create action definition with empty key or description", async () => {
+    const store = new InMemoryStore();
+
+    const ollama: OllamaAdapter = {
+      generate: async () => JSON.stringify({
+        patterns: [],
+        actionUpdates: [
+          { key: "", description: "Some description" },
+          { key: "nudge_something", description: "" },
+        ],
+      }),
+      generateWithImage: async () => "",
+    };
+
+    const node = createExtractMemoriesNode({ ollama });
+    await node(makeState(), makeConfig(store));
+
+    const allDefs = await store.search(["actions", "definitions"], { limit: 10 });
+    expect(allDefs).toHaveLength(0);
   });
 
   test("processes both patterns and actionUpdates in same response", async () => {

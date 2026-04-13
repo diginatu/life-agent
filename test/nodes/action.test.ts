@@ -541,6 +541,27 @@ describe("action node with history", () => {
     expect(capturedPrompt).not.toMatch(/no new user messages/i);
   });
 
+  test("prompt instructs to acknowledge user when feedback is present", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const replyConfig = mockActionsConfig({
+      reply: { active: true, description: "Reply to the user feedback", fallback: { body: "fallback" } },
+    });
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig: replyConfig });
+    await node(makeState({
+      userFeedback: [{ text: "hello", userId: "u1", timestamp: "2026-03-31T10:00:00.000Z" }],
+    }));
+
+    expect(capturedPrompt).toMatch(/user has sent a new message/i);
+    expect(capturedPrompt).toMatch(/do not choose.*none/i);
+  });
+
   test("works without fs deps (backward compatible)", async () => {
     const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node(makeState());
@@ -687,5 +708,87 @@ describe("action node with action definitions in store", () => {
 
     expect(capturedPrompt).toContain("Suggest the user take a short break");
     expect(capturedPrompt).toContain("Suggest the user go to sleep");
+  });
+
+  test("includes store-learned action in available actions when not in config", async () => {
+    const store = new InMemoryStore();
+    // nudge_bath is NOT in config, only in store
+    await store.put(["actions", "definitions"], "nudge_bath", {
+      description: "Remind user to take a bath before bed",
+      source: "learned",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    const config = { store } as LangGraphRunnableConfig;
+    await node(makeState(), config);
+
+    // Store-only action appears in available actions
+    expect(capturedPrompt).toContain("nudge_bath");
+    expect(capturedPrompt).toContain("Remind user to take a bath before bed");
+    // It also appears in the JSON constraint list
+    expect(capturedPrompt).toContain('"nudge_bath"');
+  });
+
+  test("does not duplicate actions that exist in both config and store", async () => {
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_break", {
+      description: "Store version",
+      source: "learned",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    const config = { store } as LangGraphRunnableConfig;
+    await node(makeState(), config);
+
+    // nudge_break should appear exactly once in available actions section
+    const matches = capturedPrompt.match(/  - nudge_break:/g);
+    expect(matches).toHaveLength(1);
+  });
+
+  test("truncates long action description in prompt", async () => {
+    const longDesc = "A".repeat(200) + "_TAIL_MARKER";
+    const store = new InMemoryStore();
+    await store.put(["actions", "definitions"], "nudge_break", {
+      description: longDesc,
+      source: "learned",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    const config = { store } as LangGraphRunnableConfig;
+    await node(makeState(), config);
+
+    expect(capturedPrompt).not.toContain("_TAIL_MARKER");
+    expect(capturedPrompt).toContain("…");
+    expect(capturedPrompt).toContain("A".repeat(100));
   });
 });

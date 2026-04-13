@@ -25,6 +25,22 @@ describe("OllamaAdapter", () => {
       const adapter = createOllamaAdapter(errorInvoker(new Error("connection refused")));
       await expect(adapter.generate("test")).rejects.toThrow("connection refused");
     });
+
+    test("passes format option to invoker call options", async () => {
+      let capturedOptions: Record<string, unknown> | undefined;
+      const invoker: LlmInvoker = {
+        invoke: async (_messages, options) => {
+          capturedOptions = options;
+          return { content: '{"patterns":[],"actionUpdates":[]}' };
+        },
+      };
+      const adapter = createOllamaAdapter(invoker);
+      const format = { type: "object", properties: { test: { type: "string" } } };
+      await adapter.generate("test prompt", { format });
+
+      expect(capturedOptions).toBeDefined();
+      expect(capturedOptions!.format).toEqual(format);
+    });
   });
 
   describe("generateWithImage", () => {

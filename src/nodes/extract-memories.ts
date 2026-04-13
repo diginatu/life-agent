@@ -13,6 +13,15 @@ import {
   type LogEntry,
   type UserFeedbackEntry,
 } from "./history-format.ts";
+import { z } from "zod/v4";
+import { toJsonSchema } from "@langchain/core/utils/json_schema";
+
+const ExtractMemoriesResponseSchema = z.object({
+  patterns: z.array(z.object({ key: z.string(), content: z.string(), category: z.string() })),
+  actionUpdates: z.array(z.object({ key: z.string(), description: z.string() })),
+});
+
+const extractMemoriesJsonSchema = toJsonSchema(ExtractMemoriesResponseSchema) as Record<string, unknown>;
 
 interface ExtractMemoriesNodeDeps {
   ollama: OllamaAdapter;
@@ -34,11 +43,6 @@ interface ExtractMemoriesNodeResult {
   errors?: string[];
 }
 
-interface ExtractedPattern {
-  key: string;
-  content: string;
-  category: string;
-}
 
 function buildExtractionPrompt(
   summary: SceneSummary,
@@ -56,9 +60,11 @@ function buildExtractionPrompt(
     : "## Existing Known Patterns\nNone yet.";
 
   const actionDefsSection = actionDefinitions.length > 0
-    ? `## Current Action Definitions\n${actionDefinitions.map((d) =>
-      `- [${d.key}] ${d.value.description}`
-    ).join("\n")}`
+    ? `## Current Action Definitions\n${actionDefinitions.map((d) => {
+      const desc = String(d.value.description);
+      const truncated = desc.length > 100 ? desc.slice(0, 100) + "…" : desc;
+      return `- [${d.key}] ${truncated}`;
+    }).join("\n")}`
     : "";
 
   const observation = [
@@ -101,23 +107,6 @@ Return a JSON object (no markdown wrapping):
 If nothing noteworthy: {"patterns": [], "actionUpdates": []}`;
 }
 
-interface ActionUpdate {
-  key: string;
-  description: string;
-}
-
-interface LlmResponse {
-  patterns: ExtractedPattern[];
-  actionUpdates: ActionUpdate[];
-}
-
-function parseLlmResponse(jsonStr: string): LlmResponse {
-  const parsed = JSON.parse(jsonStr);
-  return {
-    patterns: Array.isArray(parsed.patterns) ? parsed.patterns : [],
-    actionUpdates: Array.isArray(parsed.actionUpdates) ? parsed.actionUpdates : [],
-  };
-}
 
 export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
   return async (state: ExtractMemoriesNodeState, config: LangGraphRunnableConfig): Promise<ExtractMemoriesNodeResult> => {
@@ -162,9 +151,9 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
         logEntries,
         state.userFeedback,
       );
-      const response = await deps.ollama.generate(prompt);
-      const jsonStr = extractJson(response);
-      const { patterns, actionUpdates } = parseLlmResponse(jsonStr);
+      const response = await deps.ollama.generate(prompt, { format: extractMemoriesJsonSchema });
+      const parsed = ExtractMemoriesResponseSchema.parse(JSON.parse(extractJson(response)));
+      const { patterns, actionUpdates } = parsed;
 
       const now = new Date().toISOString();
 
@@ -199,7 +188,17 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
         if (!update.key || !update.description) continue;
 
         const existing = await store.get(ACTION_DEFS_NAMESPACE, update.key);
-        if (!existing) continue;
+
+        if (!existing) {
+          const record: ActionDefinitionRecord = {
+            description: update.description,
+            source: "learned",
+            updatedAt: now,
+          };
+          await store.put(ACTION_DEFS_NAMESPACE, update.key, record);
+          continue;
+        }
+
         const current = existing.value as ActionDefinitionRecord;
         if (current.source === "seed") continue;
 

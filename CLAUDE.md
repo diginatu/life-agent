@@ -71,3 +71,7 @@ Run index.ts
 ```sh
 bun --hot ./index.ts
 ```
+
+## Links
+
+LangChain: https://docs.langchain.com/llms.txt

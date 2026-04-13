@@ -57,10 +57,15 @@ function extractJson(text: string): string {
 }
 
 function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[], memories?: MemoryInfo[], actionDefs?: Map<string, string>, userFeedback?: UserFeedbackEntry[]): string {
-  const allActions = actionsConfig.getActionNames();
+  const configActions = actionsConfig.getActionNames();
+  const storeOnlyActions = actionDefs
+    ? [...actionDefs.keys()].filter((k) => !configActions.includes(k))
+    : [];
+  const allActions = [...configActions, ...storeOnlyActions];
   const actionDescriptions = allActions
     .map((a) => {
-      const desc = actionDefs?.get(a) ?? actionsConfig.getDescription(a);
+      const rawDesc = actionDefs?.get(a) ?? actionsConfig.getDescription(a);
+      const desc = rawDesc && rawDesc.length > 100 ? rawDesc.slice(0, 100) + "…" : rawDesc;
       return desc ? `  - ${a}: ${desc}` : `  - ${a}`;
     })
     .join("\n");
@@ -99,7 +104,7 @@ Current time:
 ${memoriesSection}${historySections}
 Available actions:
 ${actionDescriptions}
-${!userFeedback || userFeedback.length === 0 ? "\nIMPORTANT: There are no new user messages in this cycle. Do NOT just \"reply\"" : ""}
+${!userFeedback || userFeedback.length === 0 ? "\nIMPORTANT: There are no new user messages in this cycle. Do NOT just \"reply\"" : "\nIMPORTANT: The user has sent a new message this cycle. You MUST choose an action that acknowledges their message. Do NOT choose \"none\" when the user is actively communicating with you."}
 You MUST choose an action from the available actions list above. Return a JSON object with exactly these fields:
 {
   "reason": string explaining your choice
