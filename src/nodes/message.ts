@@ -3,8 +3,6 @@ import { DraftMessageSchema, type DraftMessage } from "../schemas/message.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { ActionSelection } from "../schemas/action.ts";
 import type { Config } from "../config.ts";
-import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/seed-actions.ts";
 import { formatUserFeedback, type UserFeedbackEntry } from "./history-format.ts";
 
 interface MessageNodeDeps {
@@ -63,7 +61,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       ?? { body: "Life Agent has a suggestion for you." };
   }
 
-  return async (state: MessageNodeState, config?: LangGraphRunnableConfig): Promise<MessageNodeResult> => {
+  return async (state: MessageNodeState): Promise<MessageNodeResult> => {
     if (!state.decision) {
       return { message: null, errors: ["message: no decision data in state"] };
     }
@@ -79,17 +77,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       };
     }
 
-    let actionDescription = actionsConfig.getDescription(state.decision.action);
-    try {
-      if (config?.store) {
-        const item = await config.store.get(ACTION_DEFS_NAMESPACE, state.decision.action);
-        if (item) {
-          actionDescription = (item.value as ActionDefinitionRecord).description;
-        }
-      }
-    } catch {
-      // best-effort
-    }
+    const actionDescription = actionsConfig.getDescription(state.decision.action);
 
     const prompt = buildPrompt(
       state.summary,

@@ -3,7 +3,6 @@ import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { ActionSelection } from "../schemas/action.ts";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import { ACTION_DEFS_NAMESPACE, type ActionDefinitionRecord } from "../store/seed-actions.ts";
 import { mergeDuplicatePatterns, extractJson, PATTERNS_NAMESPACE } from "../store/merge-patterns.ts";
 import { capUserPatterns } from "../store/cap-patterns.ts";
 import { formatTime } from "./format-time.ts";
@@ -18,7 +17,6 @@ import { toJsonSchema } from "@langchain/core/utils/json_schema";
 
 const ExtractMemoriesResponseSchema = z.object({
   patterns: z.array(z.object({ key: z.string(), content: z.string(), category: z.string() })),
-  actionUpdates: z.array(z.object({ key: z.string(), description: z.string() })),
 });
 
 const extractMemoriesJsonSchema = toJsonSchema(ExtractMemoriesResponseSchema) as Record<string, unknown>;
@@ -43,12 +41,10 @@ interface ExtractMemoriesNodeResult {
   errors?: string[];
 }
 
-
 function buildExtractionPrompt(
   summary: SceneSummary,
   decision: ActionSelection | undefined,
   existingMemories: Array<{ key: string; value: Record<string, unknown> }>,
-  actionDefinitions: Array<{ key: string; value: Record<string, unknown> }>,
   currentTime: Date,
   logEntries?: LogEntry[],
   userFeedback?: UserFeedbackEntry[],
@@ -58,14 +54,6 @@ function buildExtractionPrompt(
       `- [${m.key}] ${m.value.content} (category: ${m.value.category}, observed ${m.value.observedCount} times)`
     ).join("\n")}`
     : "## Existing Known Patterns\nNone yet.";
-
-  const actionDefsSection = actionDefinitions.length > 0
-    ? `## Current Action Definitions\n${actionDefinitions.map((d) => {
-      const desc = String(d.value.description);
-      const truncated = desc.length > 100 ? desc.slice(0, 100) + "…" : desc;
-      return `- [${d.key}] ${truncated}`;
-    }).join("\n")}`
-    : "";
 
   const observation = [
     `Person present: ${summary.personPresent}`,
@@ -81,10 +69,9 @@ function buildExtractionPrompt(
   const historySection = history ? `\n## Recent History\n${history}\n` : "";
   const feedbackSection = formatUserFeedback(userFeedback);
 
-  return `You are a behavioral pattern analyzer. Given a current observation, recent history, user feedback, and existing known patterns, identify any new behavioral patterns or confirm existing ones. You may also suggest refinements to action definitions based on observed feedback.
+  return `You are a behavioral pattern analyzer. Given a current observation, recent history, user feedback, and existing known patterns, identify any new behavioral patterns or confirm existing ones.
 
 ${memorySection}
-${actionDefsSection ? `\n${actionDefsSection}\n` : ""}
 ## Current Observation
 ${observation}
 ${historySection}${feedbackSection}
@@ -96,17 +83,14 @@ ${historySection}${feedbackSection}
 - Use kebab-case keys (e.g., "sleep-late", "takes-bath-before-bed", "codes-at-night")
 - Categories: "sleep", "activity", "routine", "preference", "wellness"
 - Only include patterns you are reasonably confident about
-- If user feedback (latest reply or prior replies in history) suggests an action definition should be added or refined, include an actionUpdate
 
 Return a JSON object (no markdown wrapping):
 {
-  "patterns": [{"key": "pattern-key", "content": "Description of the pattern", "category": "category"}],
-  "actionUpdates": [{"key": "action-name", "description": "Refined description based on feedback"}]
+  "patterns": [{"key": "pattern-key", "content": "Description of the pattern", "category": "category"}]
 }
 
-If nothing noteworthy: {"patterns": [], "actionUpdates": []}`;
+If nothing noteworthy: {"patterns": []}`;
 }
-
 
 export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
   return async (state: ExtractMemoriesNodeState, config: LangGraphRunnableConfig): Promise<ExtractMemoriesNodeResult> => {
@@ -126,9 +110,8 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
       : Promise.resolve(undefined);
 
     try {
-      const [existingItems, actionDefItems, logEntries] = await Promise.all([
+      const [existingItems, logEntries] = await Promise.all([
         store.search(PATTERNS_NAMESPACE, { limit: 50 }),
-        store.search(ACTION_DEFS_NAMESPACE, { limit: 50 }),
         logEntriesPromise,
       ]);
 
@@ -137,23 +120,17 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
         value: item.value,
       }));
 
-      const actionDefinitions = actionDefItems.map((item) => ({
-        key: item.key,
-        value: item.value,
-      }));
-
       const prompt = buildExtractionPrompt(
         state.summary,
         state.decision,
         existingMemories,
-        actionDefinitions,
         currentTime,
         logEntries,
         state.userFeedback,
       );
       const response = await deps.ollama.generate(prompt, { format: extractMemoriesJsonSchema });
       const parsed = ExtractMemoriesResponseSchema.parse(JSON.parse(extractJson(response)));
-      const { patterns, actionUpdates } = parsed;
+      const { patterns } = parsed;
 
       const now = new Date().toISOString();
 
@@ -183,33 +160,6 @@ export function createExtractMemoriesNode(deps: ExtractMemoriesNodeDeps) {
 
       await mergeDuplicatePatterns(store, deps.ollama, { minCountToRun: deps.mergeThreshold });
       await capUserPatterns(store, { maxPatterns: deps.maxPatterns });
-
-      for (const update of actionUpdates) {
-        if (!update.key || !update.description) continue;
-
-        const existing = await store.get(ACTION_DEFS_NAMESPACE, update.key);
-
-        if (!existing) {
-          const record: ActionDefinitionRecord = {
-            description: update.description,
-            source: "learned",
-            updatedAt: now,
-          };
-          await store.put(ACTION_DEFS_NAMESPACE, update.key, record);
-          continue;
-        }
-
-        const current = existing.value as ActionDefinitionRecord;
-        if (current.source === "seed") continue;
-
-        const record: ActionDefinitionRecord = {
-          ...current,
-          description: update.description,
-          source: "learned",
-          updatedAt: now,
-        };
-        await store.put(ACTION_DEFS_NAMESPACE, update.key, record);
-      }
     } catch {
       // best-effort
     }

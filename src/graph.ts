@@ -13,7 +13,6 @@ import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
 import { createFilesystemAdapter } from "./adapters/filesystem.ts";
 import { createDiscordAdapter } from "./adapters/discord.ts";
 import { FileStore } from "./store/file-store.ts";
-import { seedActionDefinitions } from "./store/seed-actions.ts";
 import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "./adapters/ollama.ts";
 import type { FilesystemAdapter } from "./adapters/filesystem.ts";
@@ -99,7 +98,6 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   });
 
   const store = deps.store ?? await FileStore.create({ dir: s.memoryDir });
-  await seedActionDefinitions(store, config);
 
   return new StateGraph(GraphState)
     .addNode("capture_node", async (state) => {

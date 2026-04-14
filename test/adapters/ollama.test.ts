@@ -31,7 +31,7 @@ describe("OllamaAdapter", () => {
       const invoker: LlmInvoker = {
         invoke: async (_messages, options) => {
           capturedOptions = options;
-          return { content: '{"patterns":[],"actionUpdates":[]}' };
+          return { content: '{"patterns":[]}' };
         },
       };
       const adapter = createOllamaAdapter(invoker);

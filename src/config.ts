@@ -88,7 +88,6 @@ export function loadConfig(yamlContent: string): Config {
       return raw.actions[action]?.fallback;
     },
 
-    // Seed value only — runtime reads come from the memory store via seedActionDefinitions
     getDescription(action: string) {
       return raw.actions[action]?.description;
     },
