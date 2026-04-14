@@ -47,10 +47,10 @@ describe("web server", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
 
-    const data = await res.json();
+    const data = await res.json() as { length: number; [key: number]: { eventId: string } };
     expect(Array.isArray(data)).toBe(true);
     expect(data.length).toBe(2);
-    expect(data[0].eventId).toBe("1");
+    expect(data[0]!.eventId).toBe("1");
   });
 
   test("GET /api/log/:date returns empty array when no entries", async () => {

@@ -37,7 +37,7 @@ function makeState(action: string, overrides: Record<string, unknown> = {}) {
     summary: baseSummary,
     decision: {
       action,
-      priority: "low",
+      priority: "low" as const,
       reason: "test reason",
     },
     ...overrides,

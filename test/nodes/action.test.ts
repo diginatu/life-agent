@@ -3,8 +3,6 @@ import { createActionNode } from "../../src/nodes/action.ts";
 import { ActionSelectionSchema } from "../../src/schemas/action.ts";
 import type { OllamaAdapter } from "../../src/adapters/ollama.ts";
 import type { FilesystemAdapter } from "../../src/adapters/filesystem.ts";
-import { InMemoryStore } from "@langchain/langgraph";
-import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { mockActionsConfig } from "../helpers/mock-config.ts";
 
 const actionsConfig = mockActionsConfig();
@@ -183,6 +181,22 @@ describe("action node", () => {
     expect(capturedPrompt).toContain("Suggest the user take a short break");
     expect(capturedPrompt).toContain("Suggest the user go to sleep");
   });
+
+  test("prompt does not contain Known user patterns or Previous digests", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
+    await node(makeState());
+
+    expect(capturedPrompt).not.toContain("Known user patterns");
+    expect(capturedPrompt).not.toContain("Previous digests");
+  });
 });
 
 const historyEntries = [
@@ -197,13 +211,6 @@ const historyEntries = [
     decision: { action: "nudge_break", priority: "medium", reason: "long session" },
   },
 ];
-
-const digestEntry = {
-  timestamp: "2026-03-31T08:00:00.000Z",
-  tags: ["digest"],
-  digestDate: "2026-03-30",
-  content: "## Daily Summary\n\nYesterday was a productive day.",
-};
 
 describe("action node with history", () => {
   test("includes recent history in prompt", async () => {
@@ -229,28 +236,6 @@ describe("action node with history", () => {
     expect(capturedPrompt).toContain("coding");
     expect(capturedPrompt).toContain("nudge_break");
     expect(capturedPrompt).toContain("long session");
-  });
-
-  test("includes digest content in prompt when available", async () => {
-    let capturedPrompt = "";
-    const capturingOllama: OllamaAdapter = {
-      generate: async (prompt) => {
-        capturedPrompt = prompt;
-        return validActionJson;
-      },
-      generateWithImage: async () => validActionJson,
-    };
-    const node = createActionNode({
-      ollama: capturingOllama,
-      actionsConfig,
-      fs: mockFs([digestEntry, ...historyEntries]),
-      logDir: "./logs",
-      now: () => new Date("2026-03-31T11:00:00.000Z"),
-    });
-    await node(makeState());
-
-    expect(capturedPrompt).toContain("Previous digests");
-    expect(capturedPrompt).toContain("Yesterday was a productive day");
   });
 
   test("works fine with empty history", async () => {
@@ -307,69 +292,6 @@ describe("action node with history", () => {
     await node(makeState());
 
     expect(firstN).toBe(20);
-  });
-
-  test("reads digests from multiple days when digestDays is set", async () => {
-    let capturedPrompt = "";
-    const capturingOllama: OllamaAdapter = {
-      generate: async (prompt) => {
-        capturedPrompt = prompt;
-        return validActionJson;
-      },
-      generateWithImage: async () => validActionJson,
-    };
-    const dayDigests: Record<string, unknown[]> = {
-      "2026-03-31": historyEntries,
-      "2026-03-30": [
-        { timestamp: "2026-03-30T20:00:00.000Z", tags: ["digest"], digestDate: "2026-03-30", content: "## March 30\n\nA relaxed day." },
-      ],
-      "2026-03-29": [
-        { timestamp: "2026-03-29T20:00:00.000Z", tags: ["digest"], digestDate: "2026-03-29", content: "## March 29\n\nBusy coding day." },
-      ],
-    };
-    const dateFs: FilesystemAdapter = {
-      appendJsonLine: async () => { },
-      readLastNLines: async (_dir, date) => dayDigests[date] ?? [],
-      readLastNLinesAcrossDays: async (_dir, date) => dayDigests[date] ?? [],
-    };
-    const node = createActionNode({
-      ollama: capturingOllama,
-      actionsConfig,
-      fs: dateFs,
-      logDir: "./logs",
-      digestDays: 3,
-      now: () => new Date("2026-03-31T11:00:00.000Z"),
-    });
-    await node(makeState());
-
-    expect(capturedPrompt).toContain("A relaxed day");
-    expect(capturedPrompt).toContain("Busy coding day");
-    expect(capturedPrompt).toContain("2026-03-30");
-    expect(capturedPrompt).toContain("2026-03-29");
-  });
-
-  test("skips digest section when digestDays is 0", async () => {
-    let capturedPrompt = "";
-    const capturingOllama: OllamaAdapter = {
-      generate: async (prompt) => {
-        capturedPrompt = prompt;
-        return validActionJson;
-      },
-      generateWithImage: async () => validActionJson,
-    };
-    const node = createActionNode({
-      ollama: capturingOllama,
-      actionsConfig,
-      fs: mockFs([digestEntry, ...historyEntries]),
-      logDir: "./logs",
-      digestDays: 0,
-      now: () => new Date("2026-03-31T11:00:00.000Z"),
-    });
-    await node(makeState());
-
-    expect(capturedPrompt).not.toContain("Previous digests");
-    expect(capturedPrompt).not.toContain("Yesterday was a productive day");
-    expect(capturedPrompt).toContain("Recent history");
   });
 
   test("includes sent message body in history", async () => {
@@ -570,73 +492,3 @@ describe("action node with history", () => {
     expect(result.decision!.action).toBe("nudge_break");
   });
 });
-
-describe("action node with memory store", () => {
-  test("includes memories in prompt when store has patterns", async () => {
-    const store = new InMemoryStore();
-    await store.put(["user", "patterns"], "sleep-late", {
-      content: "User typically sleeps around 2am",
-      category: "sleep",
-      observedCount: 10,
-    });
-    await store.put(["user", "patterns"], "bath-routine", {
-      content: "User takes bath before bed",
-      category: "routine",
-      observedCount: 5,
-    });
-
-    let capturedPrompt = "";
-    const capturingOllama: OllamaAdapter = {
-      generate: async (prompt) => {
-        capturedPrompt = prompt;
-        return validActionJson;
-      },
-      generateWithImage: async () => validActionJson,
-    };
-
-    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
-    const config = { store } as LangGraphRunnableConfig;
-    await node(makeState(), config);
-
-    expect(capturedPrompt).toContain("Known user patterns");
-    expect(capturedPrompt).toContain("sleeps around 2am");
-    expect(capturedPrompt).toContain("bath before bed");
-    expect(capturedPrompt).toContain("observed 10 times");
-  });
-
-  test("works without store (backward compatible)", async () => {
-    let capturedPrompt = "";
-    const capturingOllama: OllamaAdapter = {
-      generate: async (prompt) => {
-        capturedPrompt = prompt;
-        return validActionJson;
-      },
-      generateWithImage: async () => validActionJson,
-    };
-
-    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
-    await node(makeState());
-
-    expect(capturedPrompt).not.toContain("Known user patterns");
-    expect(capturedPrompt).toContain("personal assistant");
-  });
-
-  test("works with empty store", async () => {
-    const store = new InMemoryStore();
-    let capturedPrompt = "";
-    const capturingOllama: OllamaAdapter = {
-      generate: async (prompt) => {
-        capturedPrompt = prompt;
-        return validActionJson;
-      },
-      generateWithImage: async () => validActionJson,
-    };
-
-    const node = createActionNode({ ollama: capturingOllama, actionsConfig });
-    const config = { store } as LangGraphRunnableConfig;
-    await node(makeState(), config);
-
-    expect(capturedPrompt).not.toContain("Known user patterns");
-  });
-});
-

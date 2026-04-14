@@ -86,7 +86,7 @@ function allMocks(overrides: {
 describe("buildGraph (full pipeline)", () => {
   const config = mockActionsConfig();
 
-  test("happy path: all 6 nodes succeed, nudge with message", async () => {
+  test("happy path: all nodes succeed, nudge with message", async () => {
     const graph = await buildGraph(config, allMocks());
     const result = await graph.invoke({});
 
@@ -121,7 +121,7 @@ describe("buildGraph (full pipeline)", () => {
     expect(result.errors.some((e: string) => e.includes("ollama"))).toBe(true);
   });
 
-  test("logs a header separator before each of the 7 pipeline nodes", async () => {
+  test("logs a header separator before each of the 6 pipeline nodes", async () => {
     const logs: string[] = [];
     const original = console.log;
     console.log = (...args: unknown[]) => {
@@ -141,14 +141,15 @@ describe("buildGraph (full pipeline)", () => {
       "action_node",
       "message_node",
       "persist_node",
-      "extract_memories_node",
     ];
     const headers = logs.filter((line) => /==========.*==========/.test(line));
-    expect(headers.length).toBe(7);
+    expect(headers.length).toBe(6);
     nodeOrder.forEach((name, i) => {
       expect(headers[i]).toContain(name);
-      expect(headers[i]).toContain(`[${i + 1}/7]`);
+      expect(headers[i]).toContain(`[${i + 1}/6]`);
     });
+    // extract_memories_node must not appear
+    expect(headers.some((h) => h.includes("extract_memories_node"))).toBe(false);
   });
 
   test("none action: no message drafted, no notification", async () => {

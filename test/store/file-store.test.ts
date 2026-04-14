@@ -50,7 +50,7 @@ describe("FileStore", () => {
 
       const results = await store.search(["user", "patterns"]);
       expect(results).toHaveLength(1);
-      expect(results[0].key).toBe("item1");
+      expect(results[0]!.key).toBe("item1");
     });
 
     it("finds items under parent namespace prefix", async () => {
@@ -125,7 +125,7 @@ describe("FileStore", () => {
       const all = await store.search(["ns"], { limit: 5 });
       const paged = await store.search(["ns"], { limit: 5, offset: 2 });
       expect(paged).toHaveLength(3);
-      expect(paged[0].key).toBe(all[2].key);
+      expect(paged[0]!.key).toBe(all[2]!.key);
     });
 
     it("default limit is 10", async () => {

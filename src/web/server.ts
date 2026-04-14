@@ -34,8 +34,7 @@ const HTML_PAGE = `<!DOCTYPE html>
     .entry-action.passive { color: #22c55e; }
     .entry-details { color: #94a3b8; font-size: 0.85rem; }
     .entry-message { margin-top: 8px; padding: 8px 12px; background: #334155; border-radius: 6px; font-size: 0.85rem; }
-    .digest { background: #1e293b; border-radius: 8px; padding: 24px; white-space: pre-wrap; line-height: 1.6; }
-    .empty { text-align: center; color: #64748b; padding: 48px; }
+.empty { text-align: center; color: #64748b; padding: 48px; }
     .error { color: #ef4444; font-size: 0.85rem; margin-top: 4px; }
   </style>
 </head>
@@ -47,10 +46,8 @@ const HTML_PAGE = `<!DOCTYPE html>
   </div>
   <div class="tabs">
     <button class="active" onclick="showTab('timeline', this)">Timeline</button>
-    <button onclick="showTab('digest', this)">Digest</button>
   </div>
   <div id="timeline" class="timeline"></div>
-  <div id="digest" class="digest" style="display:none"></div>
 
   <script>
     const PASSIVE = new Set(["none"]);
@@ -59,7 +56,6 @@ const HTML_PAGE = `<!DOCTYPE html>
 
     function showTab(tab, btn) {
       document.getElementById("timeline").style.display = tab === "timeline" ? "flex" : "none";
-      document.getElementById("digest").style.display = tab === "digest" ? "block" : "none";
       document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
     }

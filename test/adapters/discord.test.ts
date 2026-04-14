@@ -54,8 +54,8 @@ describe("DiscordAdapter", () => {
 
       const opts = capturedOptions as { embeds: { title: string; description: string }[] };
       expect(opts.embeds).toHaveLength(1);
-      expect(opts.embeds[0].title).toBe("Test Title");
-      expect(opts.embeds[0].description).toBe("Test Body");
+      expect(opts.embeds[0]!.title).toBe("Test Title");
+      expect(opts.embeds[0]!.description).toBe("Test Body");
     });
 
   });
@@ -133,7 +133,7 @@ describe("DiscordAdapter", () => {
       const adapter = createDiscordAdapterFromChannel(channel, makeClient());
       const replies = await adapter.collectReplies("msg0");
 
-      expect(capturedAfter).toBe("msg0");
+      expect(capturedAfter as unknown as string).toBe("msg0");
       expect(replies).toHaveLength(2);
       expect(replies[0]).toEqual({
         text: "Hello from user",

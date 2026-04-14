@@ -7,7 +7,6 @@ import { createSummarizeNode } from "./nodes/summarize.ts";
 import { createActionNode } from "./nodes/action.ts";
 import { createMessageNode } from "./nodes/message.ts";
 import { createPersistNode } from "./nodes/persist.ts";
-import { createExtractMemoriesNode } from "./nodes/extract-memories.ts";
 import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
 import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
 import { createFilesystemAdapter } from "./adapters/filesystem.ts";
@@ -35,7 +34,7 @@ async function readFileBase64(path: string): Promise<string> {
   return Buffer.from(buffer).toString("base64");
 }
 
-const PIPELINE_NODE_COUNT = 7;
+const PIPELINE_NODE_COUNT = 6;
 function logNodeHeader(name: string, index: number): void {
   console.log(`\n========== [${index}/${PIPELINE_NODE_COUNT}] ${name} ==========`);
 }
@@ -81,20 +80,13 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     discord,
     now: deps.now,
   });
-  const actionNode = createActionNode({ ollama, actionsConfig: config, fs, logDir: s.logDir, historyCount: s.actionHistoryCount, digestDays: s.actionDigestDays, now: deps.now });
+  const actionNode = createActionNode({ ollama, actionsConfig: config, fs, logDir: s.logDir, historyCount: s.actionHistoryCount, now: deps.now });
   const messageNode = createMessageNode({ ollama, actionsConfig: config });
   const persistNode = createPersistNode({
     fs,
     config: { logDir: s.logDir },
     actionsConfig: config,
     discord,
-  });
-  const extractMemoriesNode = createExtractMemoriesNode({
-    ollama,
-    fs,
-    logDir: s.logDir,
-    historyCount: s.actionHistoryCount,
-    now: deps.now,
   });
 
   const store = deps.store ?? await FileStore.create({ dir: s.memoryDir });
@@ -112,9 +104,9 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
       logNodeHeader("summarize_node", 3);
       return summarizeNode(state);
     })
-    .addNode("action_node", async (state, config) => {
+    .addNode("action_node", async (state) => {
       logNodeHeader("action_node", 4);
-      return actionNode(state, config);
+      return actionNode(state);
     })
     .addNode("message_node", async (state) => {
       logNodeHeader("message_node", 5);
@@ -124,17 +116,12 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
       logNodeHeader("persist_node", 6);
       return persistNode(state);
     })
-    .addNode("extract_memories_node", async (state, config) => {
-      logNodeHeader("extract_memories_node", 7);
-      return extractMemoriesNode(state, config);
-    })
     .addEdge(START, "capture_node")
     .addEdge("capture_node", "collect_feedback_node")
     .addEdge("collect_feedback_node", "summarize_node")
     .addEdge("summarize_node", "action_node")
     .addEdge("action_node", "message_node")
     .addEdge("message_node", "persist_node")
-    .addEdge("persist_node", "extract_memories_node")
-    .addEdge("extract_memories_node", END)
+    .addEdge("persist_node", END)
     .compile({ store });
 }

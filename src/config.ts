@@ -11,13 +11,10 @@ const SettingsSchema = z.object({
   captureHeight: z.number().int().positive().default(480),
   captureRetentionCount: z.number().int().positive().default(10),
   actionHistoryCount: z.number().int().nonnegative().default(10),
-  actionDigestDays: z.number().int().nonnegative().default(1),
-  digestContextDays: z.number().int().nonnegative().default(3),
   memoryDir: z.string().default("./memory"),
   webPort: z.number().int().positive().default(3000),
   discordChannelId: z.string().default(""),
   discordMentionUserId: z.string().default(""),
-  discordDigestChannelId: z.string().default(""),
   responseStyle: z.string().default("English, friendly and concise"),
 });
 

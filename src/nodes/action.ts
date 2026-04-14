@@ -3,23 +3,13 @@ import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import { ActionSelectionSchema, type ActionSelection } from "../schemas/action.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import type { Config } from "../config.ts";
-import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import { collectPreviousDigests } from "../digest/cli.ts";
 import { formatTime } from "./format-time.ts";
 import {
   formatHistory,
   formatUserFeedback,
-  type DigestInfo,
   type LogEntry,
   type UserFeedbackEntry,
 } from "./history-format.ts";
-
-interface MemoryInfo {
-  key: string;
-  content: string;
-  category: string;
-  observedCount: number;
-}
 
 interface ActionNodeDeps {
   ollama: OllamaAdapter;
@@ -27,7 +17,6 @@ interface ActionNodeDeps {
   fs?: FilesystemAdapter;
   logDir?: string;
   historyCount?: number;
-  digestDays?: number;
   now?: () => Date;
 }
 
@@ -55,7 +44,7 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], digestInfos?: DigestInfo[], memories?: MemoryInfo[], userFeedback?: UserFeedbackEntry[]): string {
+function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: Date, logEntries?: LogEntry[], userFeedback?: UserFeedbackEntry[]): string {
   const allActions = actionsConfig.getActionNames();
   const actionDescriptions = allActions
     .map((a) => {
@@ -64,27 +53,15 @@ function buildPrompt(summary: SceneSummary, actionsConfig: Config, currentTime: 
     })
     .join("\n");
 
-  const { history, digests } = logEntries ? formatHistory(logEntries, digestInfos) : { history: "", digests: [] as DigestInfo[] };
+  const { history } = logEntries ? formatHistory(logEntries) : { history: "" };
 
   let historySections = "";
-  if (digests.length > 0) {
-    historySections += "\nPrevious digests:\n";
-    for (const d of digests) {
-      historySections += `\n[${d.date}]\n${d.content}\n`;
-    }
-  }
   historySections += formatUserFeedback(userFeedback);
   if (history) {
     historySections += `\nRecent history:\n${history}\n`;
   }
 
-  let memoriesSection = "";
-  if (memories && memories.length > 0) {
-    memoriesSection = "\nKnown user patterns:\n" +
-      memories.map((m) => `- ${m.content} (${m.category}, observed ${m.observedCount} times)`).join("\n") + "\n";
-  }
-
-  return `You are a personal assistant. Based on the scene analysis, user patterns, and history, select the most appropriate action.
+  return `You are a personal assistant. Based on the scene analysis and history, select the most appropriate action.
 
 Scene analysis:
 - Person present: ${summary.personPresent}
@@ -95,7 +72,7 @@ Scene analysis:
 
 Current time:
 - ${formatTime(currentTime)}
-${memoriesSection}${historySections}
+${historySections}
 Available actions:
 ${actionDescriptions}
 ${!userFeedback || userFeedback.length === 0 ? "\nIMPORTANT: There are no new user messages in this cycle. Do NOT just \"reply\"" : "\nIMPORTANT: The user has sent a new message this cycle. You MUST choose an action that acknowledges their message. Do NOT choose \"none\" when the user is actively communicating with you."}
@@ -110,7 +87,7 @@ Return ONLY the JSON object, no other text.`;
 }
 
 export function createActionNode(deps: ActionNodeDeps) {
-  return async (state: ActionNodeState, config?: LangGraphRunnableConfig): Promise<ActionNodeResult> => {
+  return async (state: ActionNodeState): Promise<ActionNodeResult> => {
     if (!state.summary) {
       return {
         decision: FALLBACK_DECISION,
@@ -122,7 +99,6 @@ export function createActionNode(deps: ActionNodeDeps) {
     const currentTime = now();
 
     let logEntries: LogEntry[] | undefined;
-    let digestInfos: DigestInfo[] | undefined;
     if (deps.fs && deps.logDir) {
       const dateStr = currentTime.toISOString().slice(0, 10);
       try {
@@ -130,37 +106,9 @@ export function createActionNode(deps: ActionNodeDeps) {
       } catch {
         // History is best-effort; continue without it
       }
-
-      const digestDays = deps.digestDays ?? 1;
-      if (digestDays > 0) {
-        digestInfos = await collectPreviousDigests(deps.fs, deps.logDir, dateStr, digestDays);
-      } else {
-        // Suppress digests from current day's entries too
-        if (logEntries) {
-          logEntries = logEntries.filter((e) => !e.tags?.includes("digest"));
-        }
-      }
     }
 
-    let memories: MemoryInfo[] | undefined;
-    try {
-      if (config?.store) {
-        const items = await config.store.search(["user", "patterns"], { limit: 20 });
-
-        if (items.length > 0) {
-          memories = items.map((item) => ({
-            key: item.key,
-            content: item.value.content as string,
-            category: item.value.category as string,
-            observedCount: (item.value.observedCount as number) ?? 1,
-          }));
-        }
-      }
-    } catch {
-      // best-effort
-    }
-
-    const prompt = buildPrompt(state.summary, deps.actionsConfig, currentTime, logEntries, digestInfos, memories, state.userFeedback);
+    const prompt = buildPrompt(state.summary, deps.actionsConfig, currentTime, logEntries, state.userFeedback);
 
     let rawResponse: string;
     try {

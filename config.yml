@@ -22,12 +22,6 @@ settings:
   # Number of recent log entries passed to the action LLM for context
   actionHistoryCount: 10
 
-  # Number of days of digest summaries passed to the action LLM (0 = none)
-  actionDigestDays: 1
-
-  # Number of days of previous digests passed as context when generating a new digest (0 = none)
-  digestContextDays: 3
-
   # Directory for long-term memory store (learned user patterns)
   memoryDir: ./memory
 
@@ -38,10 +32,7 @@ settings:
   # Leave empty to disable mentions. Find your ID: Discord > Settings > Advanced > Developer Mode, then right-click your name.
   discordMentionUserId: ""
 
-  # Discord channel ID for daily digest (leave empty to use discordChannelId)
-  discordDigestChannelId: ""
-
-  # Response style applied to LLM-generated user-visible text (notifications, digest).
+  # Response style applied to LLM-generated user-visible text (notifications).
   # Free-form: combine language and tone, e.g. "日本語、丁寧で優しい口調" or "French, playful and encouraging".
   responseStyle: English, friendly and concise
 

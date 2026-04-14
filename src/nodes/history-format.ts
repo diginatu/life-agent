@@ -14,28 +14,8 @@ export interface LogEntry {
   [key: string]: unknown;
 }
 
-export interface DigestInfo {
-  date: string;
-  content: string;
-}
-
-export function formatHistory(entries: LogEntry[], digestInfos?: DigestInfo[]): { history: string; digests: DigestInfo[] } {
-  const regularEntries: LogEntry[] = [];
-  const digests: DigestInfo[] = [];
-
-  for (const entry of entries) {
-    if (entry.tags?.includes("digest")) {
-      if (entry.content && entry.digestDate) {
-        digests.push({ date: entry.digestDate as string, content: entry.content });
-      }
-    } else {
-      regularEntries.push(entry);
-    }
-  }
-
-  if (digestInfos) {
-    digests.push(...digestInfos);
-  }
+export function formatHistory(entries: LogEntry[]): { history: string } {
+  const regularEntries = entries.filter((e) => !e.tags?.includes("digest"));
 
   const historyLines = regularEntries.map((e) => {
     const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "??:??";
@@ -56,7 +36,6 @@ export function formatHistory(entries: LogEntry[], digestInfos?: DigestInfo[]): 
 
   return {
     history: historyLines.length > 0 ? historyLines.join("\n") : "",
-    digests,
   };
 }
 

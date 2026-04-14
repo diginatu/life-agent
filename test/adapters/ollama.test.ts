@@ -92,7 +92,7 @@ describe("OllamaAdapter", () => {
       const adapter = createOllamaAdapter(mockInvoker("response text"));
       await adapter.generate("my prompt");
 
-      const logs = logSpy.mock.calls.map((c) => c.join(" "));
+      const logs: string[] = logSpy.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(logs.some((l) => l.includes("[LLM prompt]") && l.includes("my prompt"))).toBe(true);
       expect(logs.some((l) => l.includes("[LLM response]") && l.includes("response text"))).toBe(true);
     });
@@ -102,7 +102,7 @@ describe("OllamaAdapter", () => {
       const adapter = createOllamaAdapter(mockInvoker("image response"));
       await adapter.generateWithImage("describe image", "base64data");
 
-      const logs = logSpy.mock.calls.map((c) => c.join(" "));
+      const logs: string[] = logSpy.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(logs.some((l) => l.includes("[LLM prompt]") && l.includes("describe image"))).toBe(true);
       expect(logs.some((l) => l.includes("[LLM response]") && l.includes("image response"))).toBe(true);
     });
@@ -112,7 +112,7 @@ describe("OllamaAdapter", () => {
       const adapter = createOllamaAdapter(mockInvoker("ok"));
       await adapter.generateWithImage("describe", "secretbase64data");
 
-      const logs = logSpy.mock.calls.map((c) => c.join(" "));
+      const logs: string[] = logSpy.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(logs.some((l) => l.includes("secretbase64data"))).toBe(false);
     });
   });

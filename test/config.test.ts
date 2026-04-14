@@ -11,7 +11,6 @@ settings:
   captureWidth: 1280
   captureHeight: 720
   actionHistoryCount: 20
-  actionDigestDays: 3
 
 actions:
   none:
@@ -59,7 +58,6 @@ describe("loadConfig", () => {
       expect(config.settings.logDir).toBe("./my-logs");
       expect(config.settings.captureWidth).toBe(1280);
       expect(config.settings.actionHistoryCount).toBe(20);
-      expect(config.settings.actionDigestDays).toBe(3);
     });
 
     test("applies defaults for missing settings", () => {
@@ -71,7 +69,6 @@ describe("loadConfig", () => {
       expect(config.settings.captureWidth).toBe(640);
       expect(config.settings.captureHeight).toBe(480);
       expect(config.settings.actionHistoryCount).toBe(10);
-      expect(config.settings.actionDigestDays).toBe(1);
     });
 
     test("responseStyle defaults to English friendly phrase", () => {
@@ -89,6 +86,12 @@ actions:
 `;
       const config = loadConfig(yaml);
       expect(config.settings.responseStyle).toBe("日本語、丁寧で優しい口調");
+    });
+
+    test("actionDigestDays and digestContextDays are not present in settings", () => {
+      const config = loadConfig(MINIMAL_YAML);
+      expect((config.settings as Record<string, unknown>).actionDigestDays).toBeUndefined();
+      expect((config.settings as Record<string, unknown>).digestContextDays).toBeUndefined();
     });
 
     test("rejects invalid ollamaBaseUrl", () => {
