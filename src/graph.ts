@@ -81,7 +81,6 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     discord,
     now: deps.now,
   });
-  const actionNode = createActionNode({ ollama, actionsConfig: config, fs, logDir: s.logDir, historyCount: s.actionHistoryCount, now: deps.now });
   const messageNode = createMessageNode({ ollama, actionsConfig: config });
   const persistNode = createPersistNode({
     fs,
@@ -91,6 +90,8 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   });
 
   const store = deps.store ?? await FileStore.create({ dir: s.memoryDir });
+
+  const actionNode = createActionNode({ ollama, actionsConfig: config, fs, logDir: s.logDir, store, l2DelayHours: s.l2DelayHours, now: deps.now });
 
   const layerUpdateNode = createLayerUpdateNode({
     ollama,

@@ -26,6 +26,7 @@ function mockFs(entriesByDate: Record<string, unknown[]> = {}): FilesystemAdapte
     readLastNLines: async () => [],
     readLastNLinesAcrossDays: async () => [],
     readAllLinesForDay: async (_dir, date) => entriesByDate[date] ?? [],
+    readEntriesSince: async () => [],
   };
 }
 

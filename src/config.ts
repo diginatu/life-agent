@@ -10,7 +10,6 @@ const SettingsSchema = z.object({
   captureWidth: z.number().int().positive().default(640),
   captureHeight: z.number().int().positive().default(480),
   captureRetentionCount: z.number().int().positive().default(10),
-  actionHistoryCount: z.number().int().nonnegative().default(10),
   memoryDir: z.string().default("./memory"),
   webPort: z.number().int().positive().default(3000),
   discordChannelId: z.string().default(""),

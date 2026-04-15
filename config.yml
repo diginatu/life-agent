@@ -19,9 +19,6 @@ settings:
   # Maximum number of capture images to keep on disk (oldest pruned after each capture)
   captureRetentionCount: 10
 
-  # Number of recent log entries passed to the action LLM for context
-  actionHistoryCount: 10
-
   # Directory for long-term memory store (learned user patterns)
   memoryDir: ./memory
 

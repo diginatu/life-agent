@@ -6,6 +6,7 @@ export interface FilesystemAdapter {
   readLastNLines(dir: string, date: string, n: number): Promise<unknown[]>;
   readLastNLinesAcrossDays(dir: string, date: string, n: number, maxDaysBack?: number): Promise<unknown[]>;
   readAllLinesForDay(dir: string, date: string): Promise<unknown[]>;
+  readEntriesSince(logDir: string, sinceIso: string): Promise<unknown[]>;
 }
 
 export function createFilesystemAdapter(): FilesystemAdapter {
@@ -45,6 +46,33 @@ export function createFilesystemAdapter(): FilesystemAdapter {
         .split("\n")
         .filter((line) => line.trim().length > 0)
         .map((line) => JSON.parse(line));
+    },
+
+    async readEntriesSince(logDir, sinceIso) {
+      const result: unknown[] = [];
+      const today = new Date();
+      const maxDays = 7;
+
+      for (let i = 0; i <= maxDays; i++) {
+        const d = new Date(today);
+        d.setUTCDate(d.getUTCDate() - i);
+        const dateStr = d.toISOString().slice(0, 10);
+        const entries = await this.readAllLinesForDay(logDir, dateStr);
+
+        const newer = entries.filter((e) => {
+          const entry = e as { timestamp?: string };
+          return entry.timestamp != null && entry.timestamp > sinceIso;
+        });
+
+        result.unshift(...newer);
+
+        // Stop scanning if all entries on this day are <= sinceIso
+        if (entries.length > 0 && newer.length === 0) {
+          break;
+        }
+      }
+
+      return result;
     },
 
     async readLastNLinesAcrossDays(dir, date, n, maxDaysBack = 1) {

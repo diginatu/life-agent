@@ -51,6 +51,7 @@ export function createDryRunDeps() {
     readLastNLines: async () => [],
     readLastNLinesAcrossDays: async () => [],
     readAllLinesForDay: async () => [],
+    readEntriesSince: async () => [],
   };
 
   const discord: DiscordAdapter = {

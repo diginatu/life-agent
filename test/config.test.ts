@@ -10,7 +10,6 @@ settings:
   captureDir: ./my-captures
   captureWidth: 1280
   captureHeight: 720
-  actionHistoryCount: 20
 
 actions:
   none:
@@ -57,7 +56,6 @@ describe("loadConfig", () => {
       expect(config.settings.ollamaModel).toBe("llama3:8b");
       expect(config.settings.logDir).toBe("./my-logs");
       expect(config.settings.captureWidth).toBe(1280);
-      expect(config.settings.actionHistoryCount).toBe(20);
     });
 
     test("applies defaults for missing settings", () => {
@@ -68,7 +66,6 @@ describe("loadConfig", () => {
       expect(config.settings.captureDir).toBe("./captures");
       expect(config.settings.captureWidth).toBe(640);
       expect(config.settings.captureHeight).toBe(480);
-      expect(config.settings.actionHistoryCount).toBe(10);
     });
 
     test("responseStyle defaults to English friendly phrase", () => {

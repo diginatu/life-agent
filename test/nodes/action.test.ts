@@ -1,4 +1,5 @@
 import { test, expect, describe } from "bun:test";
+import { InMemoryStore } from "@langchain/langgraph";
 import { createActionNode } from "../../src/nodes/action.ts";
 import { ActionSelectionSchema } from "../../src/schemas/action.ts";
 import type { OllamaAdapter } from "../../src/adapters/ollama.ts";
@@ -13,6 +14,17 @@ function mockFs(entries: unknown[] = []): FilesystemAdapter {
     readLastNLines: async () => entries,
     readLastNLinesAcrossDays: async () => entries,
     readAllLinesForDay: async () => [],
+    readEntriesSince: async () => entries,
+  };
+}
+
+function mockFsWithSince(entries: unknown[], sinceEntries: unknown[]): FilesystemAdapter {
+  return {
+    appendJsonLine: async () => { },
+    readLastNLines: async () => entries,
+    readLastNLinesAcrossDays: async () => entries,
+    readAllLinesForDay: async () => [],
+    readEntriesSince: async () => sinceEntries,
   };
 }
 
@@ -22,6 +34,7 @@ function errorFs(): FilesystemAdapter {
     readLastNLines: async () => { throw new Error("fs read error"); },
     readLastNLinesAcrossDays: async () => { throw new Error("fs read error"); },
     readAllLinesForDay: async () => [],
+    readEntriesSince: async () => [],
   };
 }
 
@@ -268,33 +281,31 @@ describe("action node with history", () => {
     expect(result.errors).toBeUndefined();
   });
 
-  test("reads history with configured count", async () => {
-    let firstN = 0;
-    let callCount = 0;
+  test("readEntriesSince is called with a cutoff timestamp", async () => {
+    let capturedSince: string | undefined;
     const capturingFs: FilesystemAdapter = {
       appendJsonLine: async () => { },
-      readLastNLines: async (_dir, _date, n) => {
-        callCount++;
-        if (callCount === 1) firstN = n;
-        return historyEntries;
-      },
-      readLastNLinesAcrossDays: async (_dir, _date, n) => {
-        callCount++;
-        if (callCount === 1) firstN = n;
-        return historyEntries;
-      },
+      readLastNLines: async () => [],
+      readLastNLinesAcrossDays: async () => [],
       readAllLinesForDay: async () => [],
+      readEntriesSince: async (_dir, since) => {
+        capturedSince = since;
+        return historyEntries;
+      },
     };
+    const now = new Date("2026-04-14T10:00:00.000Z");
     const node = createActionNode({
       ollama: mockOllama(),
       actionsConfig,
       fs: capturingFs,
       logDir: "./logs",
-      historyCount: 20,
+      l2DelayHours: 1,
+      now: () => now,
     });
     await node(makeState());
 
-    expect(firstN).toBe(20);
+    // With no L2 entries, cutoff = now - (1 + l2DelayHours) * 1h = now - 2h
+    expect(capturedSince).toBe("2026-04-14T08:00:00.000Z");
   });
 
   test("includes sent message body in history", async () => {
@@ -493,5 +504,233 @@ describe("action node with history", () => {
 
     expect(result.decision).toBeDefined();
     expect(result.decision!.action).toBe("nudge_break");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// L2/L3 memory layer consumption tests
+// ---------------------------------------------------------------------------
+
+const l1Entries = [
+  {
+    timestamp: "2026-04-14T08:05:00.000Z",
+    summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
+    decision: { action: "none", priority: "low", reason: "l1 entry one" },
+  },
+  {
+    timestamp: "2026-04-14T08:30:00.000Z",
+    summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "reading", confidence: 0.8 },
+    decision: { action: "nudge_break", priority: "medium", reason: "l1 entry two" },
+  },
+];
+
+describe("action node with L2/L3 memory layers", () => {
+  test("L3 + L2 + L1 all present: correct sections, no gap, no overlap", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const store = new InMemoryStore();
+    // L3 entry: windowEnd = "2026-04-14T06:00:00.000Z"
+    await store.put(["memory", "L3"], "2026-04-14T00", {
+      content: "L3 overview content",
+      windowStart: "2026-04-14T00:00:00.000Z",
+      windowEnd: "2026-04-14T06:00:00.000Z",
+      sourceCount: 5,
+    });
+
+    // L2 entries
+    await store.put(["memory", "L2"], "2026-04-14T06", {
+      content: "L2 hour 6",
+      windowStart: "2026-04-14T06:00:00.000Z",
+      windowEnd: "2026-04-14T07:00:00.000Z",
+      sourceCount: 2,
+    });
+    await store.put(["memory", "L2"], "2026-04-14T07", {
+      content: "L2 hour 7",
+      windowStart: "2026-04-14T07:00:00.000Z",
+      windowEnd: "2026-04-14T08:00:00.000Z",
+      sourceCount: 3,
+    });
+    // This L2 entry's windowStart < L3.windowEnd — should be excluded
+    await store.put(["memory", "L2"], "2026-04-14T04", {
+      content: "L2 hour 4",
+      windowStart: "2026-04-14T04:00:00.000Z",
+      windowEnd: "2026-04-14T05:00:00.000Z",
+      sourceCount: 1,
+    });
+
+    // L1 entries: timestamps after max L2 windowEnd (2026-04-14T08:00:00.000Z)
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFsWithSince([], l1Entries),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      now: () => new Date("2026-04-14T09:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("6-hour overview");
+    expect(capturedPrompt).toContain("L3 overview content");
+    expect(capturedPrompt).toContain("Hourly overview");
+    expect(capturedPrompt).toContain("L2 hour 7");
+    expect(capturedPrompt).toContain("L2 hour 6"); // windowStart == L3.windowEnd, >= so included
+    expect(capturedPrompt).not.toContain("L2 hour 4"); // windowStart < L3.windowEnd, excluded
+    expect(capturedPrompt).toContain("Recent history");
+    expect(capturedPrompt).toContain("l1 entry one");
+  });
+
+  test("No L3: all L2 entries appear in prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const store = new InMemoryStore();
+    await store.put(["memory", "L2"], "2026-04-14T06", {
+      content: "L2 alpha",
+      windowStart: "2026-04-14T06:00:00.000Z",
+      windowEnd: "2026-04-14T07:00:00.000Z",
+      sourceCount: 2,
+    });
+    await store.put(["memory", "L2"], "2026-04-14T07", {
+      content: "L2 beta",
+      windowStart: "2026-04-14T07:00:00.000Z",
+      windowEnd: "2026-04-14T08:00:00.000Z",
+      sourceCount: 1,
+    });
+
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFsWithSince([], []),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      now: () => new Date("2026-04-14T10:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("Hourly overview");
+    expect(capturedPrompt).toContain("L2 alpha");
+    expect(capturedPrompt).toContain("L2 beta");
+    expect(capturedPrompt).not.toContain("6-hour overview");
+  });
+
+  test("No L2: L1 bounded by now - (l2DelayHours + 1h)", async () => {
+    let capturedSince: string | undefined;
+    const store = new InMemoryStore();
+    const capturingFs: FilesystemAdapter = {
+      appendJsonLine: async () => { },
+      readLastNLines: async () => [],
+      readLastNLinesAcrossDays: async () => [],
+      readAllLinesForDay: async () => [],
+      readEntriesSince: async (_dir, since) => {
+        capturedSince = since;
+        return [{ timestamp: "2026-04-14T09:00:00.000Z", summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "l1 no l2", confidence: 0.7 }, decision: { action: "none", priority: "low", reason: "no l2 entry" } }];
+      },
+    };
+
+    // now = 10:00, l2DelayHours = 1, cutoff = now - 2h = 08:00
+    let capturedPrompt = "";
+    const node = createActionNode({
+      ollama: {
+        generate: async (prompt) => { capturedPrompt = prompt; return validActionJson; },
+        generateWithImage: async () => validActionJson,
+      },
+      actionsConfig,
+      fs: capturingFs,
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      now: () => new Date("2026-04-14T10:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedSince).toBe("2026-04-14T08:00:00.000Z");
+    expect(capturedPrompt).toContain("Recent history");
+    expect(capturedPrompt).toContain("no l2 entry");
+  });
+
+  test("L1 cutoff is taken from latestL2WindowEnd (not L3)", async () => {
+    let capturedSince: string | undefined;
+    const store = new InMemoryStore();
+    // L3 entry: windowEnd "2026-04-14T06:00:00.000Z"
+    await store.put(["memory", "L3"], "2026-04-14T00", {
+      content: "L3 content",
+      windowStart: "2026-04-14T00:00:00.000Z",
+      windowEnd: "2026-04-14T06:00:00.000Z",
+      sourceCount: 2,
+    });
+    // L2 entry: windowEnd "2026-04-14T08:00:00.000Z"
+    await store.put(["memory", "L2"], "2026-04-14T07", {
+      content: "L2 hour 7",
+      windowStart: "2026-04-14T07:00:00.000Z",
+      windowEnd: "2026-04-14T08:00:00.000Z",
+      sourceCount: 1,
+    });
+
+    const capturingFs: FilesystemAdapter = {
+      appendJsonLine: async () => { },
+      readLastNLines: async () => [],
+      readLastNLinesAcrossDays: async () => [],
+      readAllLinesForDay: async () => [],
+      readEntriesSince: async (_dir, since) => {
+        capturedSince = since;
+        return [];
+      },
+    };
+
+    const node = createActionNode({
+      ollama: mockOllama(),
+      actionsConfig,
+      fs: capturingFs,
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      now: () => new Date("2026-04-14T10:00:00.000Z"),
+    });
+    await node(makeState());
+
+    // Should use L2 windowEnd "2026-04-14T08:00:00.000Z", NOT L3 windowEnd "2026-04-14T06:00:00.000Z"
+    expect(capturedSince).toBe("2026-04-14T08:00:00.000Z");
+  });
+
+  test("All empty: L3/L2/L1 sections all omitted", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const store = new InMemoryStore();
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFsWithSince([], []),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      now: () => new Date("2026-04-14T10:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).not.toContain("6-hour overview");
+    expect(capturedPrompt).not.toContain("Hourly overview");
+    expect(capturedPrompt).not.toContain("Recent history");
   });
 });

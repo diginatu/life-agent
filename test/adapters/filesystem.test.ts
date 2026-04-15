@@ -140,6 +140,56 @@ describe("FilesystemAdapter", () => {
     });
   });
 
+  describe("readEntriesSince", () => {
+    test("returns entries newer than sinceIso from single day", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-04-15", { timestamp: "2026-04-15T09:00:00.000Z", i: 1 });
+      await adapter.appendJsonLine(dir, "2026-04-15", { timestamp: "2026-04-15T10:00:00.000Z", i: 2 });
+      await adapter.appendJsonLine(dir, "2026-04-15", { timestamp: "2026-04-15T11:00:00.000Z", i: 3 });
+
+      const result = await adapter.readEntriesSince(dir, "2026-04-15T09:30:00.000Z");
+      expect(result).toHaveLength(2);
+      expect((result[0] as { i: number }).i).toBe(2);
+      expect((result[1] as { i: number }).i).toBe(3);
+    });
+
+    test("returns entries spanning multiple days", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-04-14", { timestamp: "2026-04-14T23:00:00.000Z", i: 1 });
+      await adapter.appendJsonLine(dir, "2026-04-15", { timestamp: "2026-04-15T01:00:00.000Z", i: 2 });
+
+      const result = await adapter.readEntriesSince(dir, "2026-04-14T22:00:00.000Z");
+      expect(result).toHaveLength(2);
+      expect((result[0] as { i: number }).i).toBe(1);
+      expect((result[1] as { i: number }).i).toBe(2);
+    });
+
+    test("returns empty when all entries are older", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-04-15", { timestamp: "2026-04-15T08:00:00.000Z", i: 1 });
+
+      const result = await adapter.readEntriesSince(dir, "2026-04-15T09:00:00.000Z");
+      expect(result).toEqual([]);
+    });
+
+    test("returns empty when no files exist", async () => {
+      const adapter = createFilesystemAdapter();
+      const result = await adapter.readEntriesSince(dir, "2026-04-15T09:00:00.000Z");
+      expect(result).toEqual([]);
+    });
+
+    test("excludes entries exactly at sinceIso (strict >)", async () => {
+      const adapter = createFilesystemAdapter();
+      const exactTime = "2026-04-15T09:00:00.000Z";
+      await adapter.appendJsonLine(dir, "2026-04-15", { timestamp: exactTime, i: 1 });
+      await adapter.appendJsonLine(dir, "2026-04-15", { timestamp: "2026-04-15T10:00:00.000Z", i: 2 });
+
+      const result = await adapter.readEntriesSince(dir, exactTime);
+      expect(result).toHaveLength(1);
+      expect((result[0] as { i: number }).i).toBe(2);
+    });
+  });
+
   describe("readLastNLines", () => {
     test("returns empty array for non-existent file", async () => {
       const adapter = createFilesystemAdapter();
