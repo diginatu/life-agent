@@ -87,6 +87,8 @@ describe("createLayerUpdateNode — L3 6-hour bucket rollup", () => {
       store,
       l2DelayHours: 1,
       l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
       now: () => TICK_L3_ELIGIBLE,
     });
     await node();
@@ -109,6 +111,8 @@ describe("createLayerUpdateNode — L3 6-hour bucket rollup", () => {
       store,
       l2DelayHours: 1,
       l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
       now: () => TICK_L3_NOT_YET,
     });
     await node();
@@ -140,6 +144,8 @@ describe("createLayerUpdateNode — L3 6-hour bucket rollup", () => {
       store,
       l2DelayHours: 1,
       l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
       now: () => TICK_L3_ELIGIBLE,
     });
     await node();
@@ -164,6 +170,8 @@ describe("createLayerUpdateNode — L3 6-hour bucket rollup", () => {
       store,
       l2DelayHours: 1,
       l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
       now: () => TICK_L3_ELIGIBLE,
     });
     await node();
@@ -189,6 +197,8 @@ describe("createLayerUpdateNode — L3 6-hour bucket rollup", () => {
       store,
       l2DelayHours: 1,
       l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
       now: () => TICK_L3_ELIGIBLE,
     });
     await node();
@@ -197,6 +207,132 @@ describe("createLayerUpdateNode — L3 6-hour bucket rollup", () => {
     const l3Keys = results.map((r: { key: string }) => r.key);
     expect(l3Keys).toContain("2026-04-15T06");
     expect(l3Keys).toContain("2026-04-15T00");
+  });
+});
+
+describe("createLayerUpdateNode — retention eviction", () => {
+  let store: InMemoryStore;
+  beforeEach(() => { store = new InMemoryStore(); });
+
+  test("L2 retention: evicts oldest entries when over l2MaxRetention limit", async () => {
+    const l2MaxRetention = 3;
+    // Seed 4 L2 entries older than the new tick's eligible window
+    const seedKeys = [
+      "2026-04-10T10",
+      "2026-04-10T11",
+      "2026-04-10T12",
+      "2026-04-10T13",
+    ];
+    for (const key of seedKeys) {
+      await store.put(["memory", "L2"], key, {
+        content: `summary for ${key}`,
+        windowStart: `${key}:00:00.000Z`,
+        windowEnd: `${key}:59:59.000Z`,
+        sourceCount: 1,
+      });
+    }
+
+    // TICK_ELIGIBLE (2026-04-15T12:01Z) causes a new L2 entry for 2026-04-15T10
+    const fs = mockFs({ "2026-04-15": entriesInH });
+    const node = createLayerUpdateNode({
+      ollama: mockOllama("new summary"),
+      fs,
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 9999,
+      l2MaxRetention,
+      l3MaxRetention: 9999,
+      now: () => TICK_ELIGIBLE,
+    });
+    await node();
+
+    const results = await store.search(["memory", "L2"], { limit: 10000 });
+    expect(results).toHaveLength(l2MaxRetention);
+    // Oldest entries should be evicted: 2026-04-10T10 and 2026-04-10T11
+    const keys = results.map((r: { key: string }) => r.key);
+    expect(keys).not.toContain("2026-04-10T10");
+    expect(keys).not.toContain("2026-04-10T11");
+    // Newer entries should remain
+    expect(keys).toContain("2026-04-10T12");
+    expect(keys).toContain("2026-04-10T13");
+    expect(keys).toContain(localHourKey(HOUR_H));
+  });
+
+  test("L3 retention: evicts oldest entries when over l3MaxRetention limit", async () => {
+    const l3MaxRetention = 2;
+    // Seed 3 existing L3 entries
+    const oldL3Keys = [
+      { key: "2026-04-12T00", ws: "2026-04-12T00:00:00.000Z" },
+      { key: "2026-04-12T06", ws: "2026-04-12T06:00:00.000Z" },
+      { key: "2026-04-12T12", ws: "2026-04-12T12:00:00.000Z" },
+    ];
+    for (const { key, ws } of oldL3Keys) {
+      await store.put(["memory", "L3"], key, {
+        content: `l3 summary ${key}`,
+        windowStart: ws,
+        windowEnd: new Date(new Date(ws).getTime() + 6 * 3600000).toISOString(),
+        sourceCount: 1,
+      });
+    }
+    // Seed L2 entries for bucket 2026-04-15T06 so a new L3 entry is written
+    await seedL2(store, l2EntriesForBucket);
+
+    const node = createLayerUpdateNode({
+      ollama: mockOllama("new l3 summary"),
+      fs: mockFs(),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention,
+      now: () => TICK_L3_ELIGIBLE,
+    });
+    await node();
+
+    const results = await store.search(["memory", "L3"], { limit: 10000 });
+    expect(results).toHaveLength(l3MaxRetention);
+    const keys = results.map((r: { key: string }) => r.key);
+    // Oldest should be evicted
+    expect(keys).not.toContain("2026-04-12T00");
+    expect(keys).not.toContain("2026-04-12T06");
+    // Newer entries remain
+    expect(keys).toContain("2026-04-12T12");
+    expect(keys).toContain("2026-04-15T06");
+  });
+
+  test("no eviction when count is at or under limit", async () => {
+    // Seed exactly l2MaxRetention entries; after writing one new entry that already exists,
+    // count stays at max and no eviction occurs
+    const l2MaxRetention = 5;
+    for (let i = 0; i < l2MaxRetention; i++) {
+      const key = `2026-04-10T${String(i).padStart(2, '0')}`;
+      await store.put(["memory", "L2"], key, {
+        content: `summary ${key}`,
+        windowStart: `${key}:00:00.000Z`,
+        windowEnd: `${key}:59:59.000Z`,
+        sourceCount: 1,
+      });
+    }
+
+    // No new L2 entry written (no entries in fs), count stays <= max
+    const fs = mockFs({});
+    const node = createLayerUpdateNode({
+      ollama: mockOllama(),
+      fs,
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 9999,
+      l2MaxRetention,
+      l3MaxRetention: 9999,
+      now: () => TICK_ELIGIBLE,
+    });
+    await node();
+
+    const results = await store.search(["memory", "L2"], { limit: 10000 });
+    expect(results).toHaveLength(l2MaxRetention);
   });
 });
 
@@ -213,6 +349,8 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
       store,
       l2DelayHours: 1,
       l3DelayHours: 9999,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
       now: () => TICK_ELIGIBLE,
     });
     await node();
@@ -235,6 +373,8 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
       store,
       l2DelayHours: 1,
       l3DelayHours: 9999,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
       now: () => TICK_NOT_YET,
     });
     await node();
@@ -266,6 +406,8 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
       store,
       l2DelayHours: 1,
       l3DelayHours: 9999,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
       now: () => TICK_ELIGIBLE,
     });
     await node();
@@ -284,6 +426,8 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
       store,
       l2DelayHours: 1,
       l3DelayHours: 9999,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
       now: () => TICK_ELIGIBLE,
     });
     await node();
@@ -312,6 +456,8 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
       store,
       l2DelayHours: 1,
       l3DelayHours: 9999,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
       now: () => TICK_ELIGIBLE,
     });
     await node();

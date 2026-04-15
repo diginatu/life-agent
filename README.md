@@ -29,10 +29,6 @@ bun run src/index.ts
 # Run with mock adapters (no hardware/Ollama needed)
 bun run src/index.ts --dry-run
 
-# Daily digest (summarize today's logs with LLM)
-bun run src/index.ts --digest
-bun run src/index.ts --digest --date 2026-03-29
-
 # Web dashboard (view timeline at http://localhost:3000)
 bun run src/web/entry.ts
 
@@ -91,12 +87,12 @@ See `config.yml` for all available settings and their defaults.
 The agent runs a 7-node LangGraph pipeline on each invocation:
 
 1. **Capture** — grabs a webcam frame via ffmpeg
-2. **CollectFeedback** — pulls any new Discord replies since the last run and attaches them to state so the action step can react in the same run
+2. **CollectFeedback** — pulls any new Discord replies since the last run
 3. **Summarize** — sends the image to Ollama for scene description
-4. **Action** — LLM selects an action from the allowed set, using history, digests, long-term patterns, and the latest user reply
+4. **Action** — LLM selects an action using L1/L2/L3 memory layers and the latest user reply
 5. **Message** — LLM drafts a notification message (if needed)
 6. **Persist** — writes JSONL log + sends Discord notification
-7. **ExtractMemories** — LLM distills the observation into long-term user patterns, then runs a duplicate-merge pass and caps the pattern store (LRU by `observedCount`)
+7. **LayerUpdate** — rolls up L1 logs into hourly L2 summaries and L2 into 6-hour L3 summaries (delayed, idempotent, catches up after sleep)
 
 Actions are data-driven via `config.yml`; see that file for the current set.
 

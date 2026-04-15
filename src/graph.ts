@@ -100,6 +100,8 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     store,
     l2DelayHours: s.l2DelayHours,
     l3DelayHours: s.l3DelayHours,
+    l2MaxRetention: s.l2MaxRetention,
+    l3MaxRetention: s.l3MaxRetention,
     now: deps.now,
   });
 

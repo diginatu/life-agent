@@ -29,6 +29,16 @@ test("discordChannelId defaults to empty string", () => {
   expect(config.settings.discordChannelId).toBe("");
 });
 
+test("l2MaxRetention defaults to 48", () => {
+  const config = loadConfig(minimalYaml);
+  expect(config.settings.l2MaxRetention).toBe(48);
+});
+
+test("l3MaxRetention defaults to 28", () => {
+  const config = loadConfig(minimalYaml);
+  expect(config.settings.l3MaxRetention).toBe(28);
+});
+
 test("discordChannelId is parsed from YAML", () => {
   const yaml = `
 settings:

@@ -4,7 +4,7 @@ Life Agent captures webcam images, analyzes them with a local LLM (Ollama), and 
 
 ## Architecture
 
-7-node LangGraph pipeline: Capture → CollectFeedback → Summarize → Action → Message → Persist → ExtractMemories.
+7-node LangGraph pipeline: Capture → CollectFeedback → Summarize → Action → Message → Persist → LayerUpdate.
 Each node is a factory function (`createXxxNode(deps)`) returning an async state handler.
 Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore for dry-run) accessible via `config.store` in nodes.
 
@@ -13,7 +13,12 @@ Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore fo
 - **Adapter DI**: External services (Ollama, filesystem, ffmpeg, Discord) injected as interfaces. `--dry-run` uses mocks.
 - **Config**: Zod-validated YAML (`config.yml` + `config.local.yml` override). Actions are data-driven.
 - **Discord reply loop**: `CollectFeedback` node reads the last log entry's Discord cursor (`discordMessageId` or `discordLastSeenMessageId`), fetches replies via `discord.collectReplies`, and puts them on `state.userFeedback`. The `Action` node injects those replies into the LLM prompt in the same run (no multi-run delay). `Persist` writes them back to the log entry as `feedbackFromPrevious` for audit / history.
-- **Long-term memory**: `FileStore` (custom `BaseStore` subclass) persists learned user patterns to `{memoryDir}/store.json`. ExtractMemories node writes; Action node reads. After each write, `mergeDuplicatePatterns` (LLM-driven, threshold-gated) collapses near-duplicate keys into canonical ones, then `capUserPatterns` enforces a max pattern count by evicting lowest `observedCount` first (tiebreak: oldest `lastObserved`).
+- **3-layer time-windowed memory**:
+  - **L1** — raw JSONL log entries in `logs/`. Read from latest L2 `windowEnd` to now (no count cap).
+  - **L2** — hourly LLM summary, delayed by `l2DelayHours` (default 1h) so recent logs stay in L1. Keyed by local-time hour `YYYY-MM-DDTHH`. Capped at `l2MaxRetention` entries (default 48 ≈ 2 days).
+  - **L3** — 6-hour LLM summary of L2 entries, delayed by `l3DelayHours` (default 6h). Buckets aligned to 00/06/12/18 UTC. Capped at `l3MaxRetention` entries (default 28 ≈ 7 days).
+  All three layers are injected into the Action prompt with no gap. `LayerUpdate` node runs each tick and catches up missed windows after sleep.
+  Stored in `{memoryDir}/store.json` under namespaces `["memory","L2"]` and `["memory","L3"]`.
 - **Sprint convention**: Commits follow `feat: <description> (Sprint N)`.
 
 Default to using Bun instead of Node.js.
@@ -31,7 +36,7 @@ Service is `Type=oneshot`, `WorkingDirectory={repo}`, runs `bun run src/index.ts
 Runtime paths (defaults in `src/config.ts`, relative to repo root which is the systemd WorkingDirectory):
 - `./logs/` — JSONL action logs
 - `./captures/` — webcam frame snapshots
-- `./memory/store.json` — long-term pattern store (FileStore)
+- `./memory/store.json` — L2 hourly and L3 6-hour summaries (FileStore, namespaces `["memory","L2"]` and `["memory","L3"]`)
 - Web dashboard: `http://localhost:3000` (`bun run src/web/entry.ts`)
 
 Operating a running install:

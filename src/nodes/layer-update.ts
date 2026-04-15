@@ -11,6 +11,8 @@ export interface LayerUpdateNodeDeps {
   store: BaseStore;
   l2DelayHours: number;
   l3DelayHours: number;
+  l2MaxRetention: number;
+  l3MaxRetention: number;
   now?: () => Date;
 }
 
@@ -102,6 +104,20 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         windowEnd: hEnd,
         sourceCount: entries.length,
       });
+
+      // Evict oldest L2 entries if over retention limit
+      const allL2AfterWrite = await deps.store.search(L2_NAMESPACE as unknown as string[], { limit: 10000 });
+      if (allL2AfterWrite.length > deps.l2MaxRetention) {
+        const sorted = [...allL2AfterWrite].sort((a, b) => {
+          const aWs = (a.value as { windowStart?: string }).windowStart ?? "";
+          const bWs = (b.value as { windowStart?: string }).windowStart ?? "";
+          return aWs < bWs ? -1 : aWs > bWs ? 1 : 0;
+        });
+        const toEvict = sorted.slice(0, allL2AfterWrite.length - deps.l2MaxRetention);
+        for (const item of toEvict) {
+          await deps.store.delete(L2_NAMESPACE as unknown as string[], item.key);
+        }
+      }
     }
 
     // --- L3: 6-hour bucket rollup ---
@@ -147,6 +163,20 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         windowEnd: bEnd,
         sourceCount: l2Items.length,
       });
+
+      // Evict oldest L3 entries if over retention limit
+      const allL3AfterWrite = await deps.store.search(L3_NAMESPACE as unknown as string[], { limit: 10000 });
+      if (allL3AfterWrite.length > deps.l3MaxRetention) {
+        const sorted = [...allL3AfterWrite].sort((a, b) => {
+          const aWs = (a.value as { windowStart?: string }).windowStart ?? "";
+          const bWs = (b.value as { windowStart?: string }).windowStart ?? "";
+          return aWs < bWs ? -1 : aWs > bWs ? 1 : 0;
+        });
+        const toEvict = sorted.slice(0, allL3AfterWrite.length - deps.l3MaxRetention);
+        for (const item of toEvict) {
+          await deps.store.delete(L3_NAMESPACE as unknown as string[], item.key);
+        }
+      }
     }
 
     return {};

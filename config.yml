@@ -39,6 +39,12 @@ settings:
   # Hours to delay L3 6-hour bucket rollup (keep recent L2 entries unmerged)
   l3DelayHours: 6
 
+  # Maximum number of L2 hourly entries to keep in store
+  l2MaxRetention: 48
+
+  # Maximum number of L3 6-hour entries to keep in store
+  l3MaxRetention: 28
+
 # Action definitions
 # - active: true = triggers Discord notification; false = logged only, no notification
 # - description: seed value for LLM context; evolved at runtime via memory store

@@ -17,6 +17,8 @@ const SettingsSchema = z.object({
   responseStyle: z.string().default("English, friendly and concise"),
   l2DelayHours: z.number().int().nonnegative().default(1),
   l3DelayHours: z.number().int().nonnegative().default(6),
+  l2MaxRetention: z.number().int().positive().default(48),
+  l3MaxRetention: z.number().int().positive().default(28),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
