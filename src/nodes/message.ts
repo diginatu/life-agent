@@ -32,11 +32,9 @@ function extractJson(text: string): string {
 function buildPrompt(summary: SceneSummary, decision: ActionSelection, responseStyle: string, actionDescription?: string, userFeedback?: UserFeedbackEntry[]): string {
   const descLine = actionDescription ? `\n- Action description: ${actionDescription}` : "";
   const feedbackSection = formatUserFeedback(userFeedback);
-  return `Follow this response style: ${responseStyle}.
-
-You are a personal assistant. Draft a mention post for the user.
+  return `You are a personal assistant. Draft a mention post for the user according to the context.
 This message will be posted in a Discord channel and will mention the user. Do no include the mention in the body.
-Feel free to include any context. If the user recently replied, acknowledge it or adjust your tone accordingly.
+Follow this response style: ${responseStyle}.
 
 Context:
 - Action: ${decision.action}${descLine}
