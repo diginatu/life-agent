@@ -91,7 +91,6 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
       });
 
       if (entries.length === 0) {
-        console.log(`[layer-update] L2 skip "${key}" (no entries)`);
         continue;
       }
 
@@ -137,7 +136,6 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         .map((item: { value: unknown }) => item.value as { content: string; windowStart: string; windowEnd: string; sourceCount: number });
 
       if (l2Items.length === 0) {
-        console.log(`[layer-update] L3 skip "${bucketKey}" (no L2 items)`);
         continue;
       }
 
