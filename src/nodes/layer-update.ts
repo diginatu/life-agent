@@ -65,7 +65,10 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
 
     for (let h = new Date(scanStart); h <= cutoff; h = new Date(h.getTime() + 3600000)) {
       const key = toLocalHourKey(h);
-      if (existingKeys.has(key)) continue;
+      if (existingKeys.has(key)) {
+        console.log(`[layer-update] L2 skip "${key}" (already exists)`);
+        continue;
+      }
 
       const hStart = h.toISOString();
       const hEnd = new Date(h.getTime() + 3600000).toISOString();
@@ -87,7 +90,10 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         return e.timestamp >= hStart && e.timestamp < hEnd;
       });
 
-      if (entries.length === 0) continue;
+      if (entries.length === 0) {
+        console.log(`[layer-update] L2 skip "${key}" (no entries)`);
+        continue;
+      }
 
       const content = await summarizeLayer(deps.ollama, entries, key);
 
@@ -112,7 +118,10 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
 
     for (let b = new Date(l3ScanStart); b <= l3Cutoff; b = new Date(b.getTime() + L3_BUCKET_MS)) {
       const bucketKey = toL3BucketKey(b);
-      if (existingL3Keys.has(bucketKey)) continue;
+      if (existingL3Keys.has(bucketKey)) {
+        console.log(`[layer-update] L3 skip "${bucketKey}" (already exists)`);
+        continue;
+      }
 
       const bStart = b.toISOString();
       const bEnd = new Date(b.getTime() + L3_BUCKET_MS).toISOString();
@@ -127,7 +136,10 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         })
         .map((item: { value: unknown }) => item.value as { content: string; windowStart: string; windowEnd: string; sourceCount: number });
 
-      if (l2Items.length === 0) continue;
+      if (l2Items.length === 0) {
+        console.log(`[layer-update] L3 skip "${bucketKey}" (no L2 items)`);
+        continue;
+      }
 
       const content = await summarizeLayer(deps.ollama, l2Items as unknown as Parameters<typeof summarizeLayer>[1], bucketKey);
 
