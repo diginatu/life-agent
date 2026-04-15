@@ -11,6 +11,7 @@ function mockFs(entries: unknown[] = []): FilesystemAdapter {
     appendJsonLine: async () => {},
     readLastNLines: async () => entries,
     readLastNLinesAcrossDays: async () => entries,
+    readAllLinesForDay: async () => [],
   };
 }
 
@@ -168,6 +169,7 @@ describe("collect-feedback node", () => {
         calledMethod = "readLastNLinesAcrossDays";
         return [{ discordMessageId: "msg-from-yesterday" }];
       },
+      readAllLinesForDay: async () => [],
     };
     const node = createCollectFeedbackNode({
       fs,

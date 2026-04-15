@@ -39,6 +39,7 @@ function emptyFs(): FilesystemAdapter {
     appendJsonLine: async () => {},
     readLastNLines: async () => [],
     readLastNLinesAcrossDays: async () => [],
+    readAllLinesForDay: async () => [],
   };
 }
 
@@ -156,6 +157,7 @@ describe("summarize node", () => {
       readLastNLinesAcrossDays: async () => [
         { capture: { imagePath: "/tmp/prev.jpg" } },
       ],
+      readAllLinesForDay: async () => [],
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -200,6 +202,7 @@ describe("summarize node", () => {
       readLastNLinesAcrossDays: async () => [
         { capture: { imagePath: "/tmp/gone.jpg" } },
       ],
+      readAllLinesForDay: async () => [],
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -220,6 +223,7 @@ describe("summarize node", () => {
       appendJsonLine: async () => {},
       readLastNLines: async () => { throw new Error("disk error"); },
       readLastNLinesAcrossDays: async () => { throw new Error("disk error"); },
+      readAllLinesForDay: async () => [],
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -262,6 +266,7 @@ describe("summarize node", () => {
           },
         },
       ],
+      readAllLinesForDay: async () => [],
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -290,6 +295,7 @@ describe("summarize node", () => {
       readLastNLinesAcrossDays: async () => [
         { capture: { imagePath: "/tmp/prev.jpg" } },
       ],
+      readAllLinesForDay: async () => [],
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -335,6 +341,7 @@ describe("summarize node", () => {
           },
         },
       ],
+      readAllLinesForDay: async () => [],
     };
     const node = createSummarizeNode({
       ...baseDeps,

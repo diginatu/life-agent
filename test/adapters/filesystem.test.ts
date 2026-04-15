@@ -121,6 +121,25 @@ describe("FilesystemAdapter", () => {
     });
   });
 
+  describe("readAllLinesForDay", () => {
+    test("returns all entries for the given date", async () => {
+      const adapter = createFilesystemAdapter();
+      await adapter.appendJsonLine(dir, "2026-04-15", { i: 1 });
+      await adapter.appendJsonLine(dir, "2026-04-15", { i: 2 });
+      await adapter.appendJsonLine(dir, "2026-04-15", { i: 3 });
+      const result = await adapter.readAllLinesForDay(dir, "2026-04-15");
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ i: 1 });
+      expect(result[2]).toEqual({ i: 3 });
+    });
+
+    test("returns empty for missing file", async () => {
+      const adapter = createFilesystemAdapter();
+      const result = await adapter.readAllLinesForDay(dir, "2099-01-01");
+      expect(result).toEqual([]);
+    });
+  });
+
   describe("readLastNLines", () => {
     test("returns empty array for non-existent file", async () => {
       const adapter = createFilesystemAdapter();

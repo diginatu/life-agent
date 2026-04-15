@@ -12,6 +12,7 @@ function mockFs(entries: unknown[] = []): FilesystemAdapter {
     appendJsonLine: async () => { },
     readLastNLines: async () => entries,
     readLastNLinesAcrossDays: async () => entries,
+    readAllLinesForDay: async () => [],
   };
 }
 
@@ -20,6 +21,7 @@ function errorFs(): FilesystemAdapter {
     appendJsonLine: async () => { },
     readLastNLines: async () => { throw new Error("fs read error"); },
     readLastNLinesAcrossDays: async () => { throw new Error("fs read error"); },
+    readAllLinesForDay: async () => [],
   };
 }
 
@@ -281,6 +283,7 @@ describe("action node with history", () => {
         if (callCount === 1) firstN = n;
         return historyEntries;
       },
+      readAllLinesForDay: async () => [],
     };
     const node = createActionNode({
       ollama: mockOllama(),

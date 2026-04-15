@@ -5,6 +5,7 @@ export interface FilesystemAdapter {
   appendJsonLine(dir: string, date: string, data: unknown): Promise<void>;
   readLastNLines(dir: string, date: string, n: number): Promise<unknown[]>;
   readLastNLinesAcrossDays(dir: string, date: string, n: number, maxDaysBack?: number): Promise<unknown[]>;
+  readAllLinesForDay(dir: string, date: string): Promise<unknown[]>;
 }
 
 export function createFilesystemAdapter(): FilesystemAdapter {
@@ -33,6 +34,17 @@ export function createFilesystemAdapter(): FilesystemAdapter {
 
       const lastN = lines.slice(-n);
       return lastN.map((line) => JSON.parse(line));
+    },
+
+    async readAllLinesForDay(dir, date) {
+      const filePath = join(dir, `${date}.jsonl`);
+      const file = Bun.file(filePath);
+      if (!(await file.exists())) return [];
+      const content = await file.text();
+      return content
+        .split("\n")
+        .filter((line) => line.trim().length > 0)
+        .map((line) => JSON.parse(line));
     },
 
     async readLastNLinesAcrossDays(dir, date, n, maxDaysBack = 1) {

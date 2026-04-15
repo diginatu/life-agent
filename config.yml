@@ -36,6 +36,9 @@ settings:
   # Free-form: combine language and tone, e.g. "日本語、丁寧で優しい口調" or "French, playful and encouraging".
   responseStyle: English, friendly and concise
 
+  # Hours to delay L2 hourly rollup (keep recent logs in L1)
+  l2DelayHours: 1
+
 # Action definitions
 # - active: true = triggers Discord notification; false = logged only, no notification
 # - description: seed value for LLM context; evolved at runtime via memory store

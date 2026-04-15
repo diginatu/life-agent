@@ -7,6 +7,7 @@ import { createSummarizeNode } from "./nodes/summarize.ts";
 import { createActionNode } from "./nodes/action.ts";
 import { createMessageNode } from "./nodes/message.ts";
 import { createPersistNode } from "./nodes/persist.ts";
+import { createLayerUpdateNode } from "./nodes/layer-update.ts";
 import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
 import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
 import { createFilesystemAdapter } from "./adapters/filesystem.ts";
@@ -34,7 +35,7 @@ async function readFileBase64(path: string): Promise<string> {
   return Buffer.from(buffer).toString("base64");
 }
 
-const PIPELINE_NODE_COUNT = 6;
+const PIPELINE_NODE_COUNT = 7;
 function logNodeHeader(name: string, index: number): void {
   console.log(`\n========== [${index}/${PIPELINE_NODE_COUNT}] ${name} ==========`);
 }
@@ -91,6 +92,15 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
 
   const store = deps.store ?? await FileStore.create({ dir: s.memoryDir });
 
+  const layerUpdateNode = createLayerUpdateNode({
+    ollama,
+    fs,
+    logDir: s.logDir,
+    store,
+    l2DelayHours: s.l2DelayHours,
+    now: deps.now,
+  });
+
   return new StateGraph(GraphState)
     .addNode("capture_node", async (state) => {
       logNodeHeader("capture_node", 1);
@@ -116,12 +126,17 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
       logNodeHeader("persist_node", 6);
       return persistNode(state);
     })
+    .addNode("layer_update_node", async () => {
+      logNodeHeader("layer_update_node", 7);
+      return layerUpdateNode();
+    })
     .addEdge(START, "capture_node")
     .addEdge("capture_node", "collect_feedback_node")
     .addEdge("collect_feedback_node", "summarize_node")
     .addEdge("summarize_node", "action_node")
     .addEdge("action_node", "message_node")
     .addEdge("message_node", "persist_node")
-    .addEdge("persist_node", END)
+    .addEdge("persist_node", "layer_update_node")
+    .addEdge("layer_update_node", END)
     .compile({ store });
 }

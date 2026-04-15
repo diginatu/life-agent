@@ -13,6 +13,7 @@ function mockFs(): FilesystemAdapter & { written: unknown[] } {
     appendJsonLine: async (_dir, _date, data) => { written.push(data); },
     readLastNLines: async () => [],
     readLastNLinesAcrossDays: async () => [],
+    readAllLinesForDay: async () => [],
   };
 }
 
@@ -103,6 +104,7 @@ describe("persist node", () => {
       appendJsonLine: async () => { throw new Error("disk full"); },
       readLastNLines: async () => [],
       readLastNLinesAcrossDays: async () => [],
+      readAllLinesForDay: async () => [],
     };
     const node = createPersistNode({ fs: failingFs, config: { logDir: "./logs" }, actionsConfig });
 

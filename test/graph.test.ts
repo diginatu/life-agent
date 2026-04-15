@@ -57,6 +57,7 @@ function mockFs(lastEntries: unknown[] = []): FilesystemAdapter {
     appendJsonLine: async () => {},
     readLastNLines: async () => lastEntries,
     readLastNLinesAcrossDays: async () => lastEntries,
+    readAllLinesForDay: async () => [],
   };
 }
 
@@ -121,7 +122,7 @@ describe("buildGraph (full pipeline)", () => {
     expect(result.errors.some((e: string) => e.includes("ollama"))).toBe(true);
   });
 
-  test("logs a header separator before each of the 6 pipeline nodes", async () => {
+  test("logs a header separator before each of the 7 pipeline nodes", async () => {
     const logs: string[] = [];
     const original = console.log;
     console.log = (...args: unknown[]) => {
@@ -141,12 +142,13 @@ describe("buildGraph (full pipeline)", () => {
       "action_node",
       "message_node",
       "persist_node",
+      "layer_update_node",
     ];
     const headers = logs.filter((line) => /==========.*==========/.test(line));
-    expect(headers.length).toBe(6);
+    expect(headers.length).toBe(7);
     nodeOrder.forEach((name, i) => {
       expect(headers[i]).toContain(name);
-      expect(headers[i]).toContain(`[${i + 1}/6]`);
+      expect(headers[i]).toContain(`[${i + 1}/7]`);
     });
     // extract_memories_node must not appear
     expect(headers.some((h) => h.includes("extract_memories_node"))).toBe(false);
