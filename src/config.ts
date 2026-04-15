@@ -17,6 +17,7 @@ const SettingsSchema = z.object({
   discordMentionUserId: z.string().default(""),
   responseStyle: z.string().default("English, friendly and concise"),
   l2DelayHours: z.number().int().nonnegative().default(1),
+  l3DelayHours: z.number().int().nonnegative().default(6),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;

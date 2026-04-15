@@ -50,6 +50,155 @@ const entriesInH: { timestamp: string; summary: { activityGuess: string; posture
   },
 ];
 
+// --- L3 test fixtures ---
+// Bucket B = 2026-04-15T06:00:00Z (aligned to 06:00 UTC)
+// B+6h     = 2026-04-15T12:00:00Z
+// With l3DelayHours=6: eligible when now >= B+6h+6h = 2026-04-15T18:00:00Z
+const L3_BUCKET_B = new Date("2026-04-15T06:00:00.000Z");
+const L3_BUCKET_B_END = new Date("2026-04-15T12:00:00.000Z");
+const TICK_L3_ELIGIBLE = new Date("2026-04-15T18:01:00.000Z"); // B+6h+l3DelayHours+1min
+const TICK_L3_NOT_YET  = new Date("2026-04-15T17:59:00.000Z"); // B+6h+l3DelayHours-1min
+
+// L2 entries placed in [B, B+6h)
+const l2EntriesForBucket = [
+  { content: "l2 hour 06 summary", windowStart: "2026-04-15T06:00:00.000Z", windowEnd: "2026-04-15T07:00:00.000Z", sourceCount: 3 },
+  { content: "l2 hour 07 summary", windowStart: "2026-04-15T07:00:00.000Z", windowEnd: "2026-04-15T08:00:00.000Z", sourceCount: 2 },
+];
+
+/** Seed the given store with L2 entries for the bucket. */
+async function seedL2(store: InMemoryStore, entries: typeof l2EntriesForBucket): Promise<void> {
+  for (const entry of entries) {
+    const key = entry.windowStart.slice(0, 13).replace("T", "T"); // "2026-04-15T06"
+    await store.put(["memory", "L2"], key, entry);
+  }
+}
+
+describe("createLayerUpdateNode — L3 6-hour bucket rollup", () => {
+  let store: InMemoryStore;
+  beforeEach(() => { store = new InMemoryStore(); });
+
+  test("eligible tick: writes L3 key for bucket B when delay has elapsed", async () => {
+    await seedL2(store, l2EntriesForBucket);
+    const node = createLayerUpdateNode({
+      ollama: mockOllama("6h summary"),
+      fs: mockFs(),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      now: () => TICK_L3_ELIGIBLE,
+    });
+    await node();
+
+    const bucketKey = "2026-04-15T06";
+    const item = await store.get(["memory", "L3"], bucketKey);
+    expect(item).not.toBeNull();
+    expect(item!.value.content).toBe("6h summary");
+    expect(item!.value.sourceCount).toBe(2);
+    expect(item!.value.windowStart).toBe(L3_BUCKET_B.toISOString());
+    expect(item!.value.windowEnd).toBe(L3_BUCKET_B_END.toISOString());
+  });
+
+  test("not-yet tick: no L3 write when delay has not elapsed", async () => {
+    await seedL2(store, l2EntriesForBucket);
+    const node = createLayerUpdateNode({
+      ollama: mockOllama("6h summary"),
+      fs: mockFs(),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      now: () => TICK_L3_NOT_YET,
+    });
+    await node();
+
+    const bucketKey = "2026-04-15T06";
+    const item = await store.get(["memory", "L3"], bucketKey);
+    expect(item).toBeNull();
+  });
+
+  test("idempotent: existing L3 key prevents LLM call and overwrite", async () => {
+    await seedL2(store, l2EntriesForBucket);
+    const bucketKey = "2026-04-15T06";
+    await store.put(["memory", "L3"], bucketKey, {
+      content: "already written",
+      windowStart: L3_BUCKET_B.toISOString(),
+      windowEnd: L3_BUCKET_B_END.toISOString(),
+      sourceCount: 1,
+    });
+
+    let generateCalled = false;
+    const capturingOllama: OllamaAdapter = {
+      generate: async () => { generateCalled = true; return "new summary"; },
+      generateWithImage: async () => "",
+    };
+    const node = createLayerUpdateNode({
+      ollama: capturingOllama,
+      fs: mockFs(),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      now: () => TICK_L3_ELIGIBLE,
+    });
+    await node();
+
+    expect(generateCalled).toBe(false);
+    const item = await store.get(["memory", "L3"], bucketKey);
+    expect(item!.value.content).toBe("already written");
+  });
+
+  test("empty bucket: no L2 entries in bucket → no L3 write", async () => {
+    // Seed L2 entries OUTSIDE the bucket [B, B+6h)
+    await store.put(["memory", "L2"], "2026-04-15T00", {
+      content: "midnight hour",
+      windowStart: "2026-04-15T00:00:00.000Z",
+      windowEnd: "2026-04-15T01:00:00.000Z",
+      sourceCount: 1,
+    });
+    const node = createLayerUpdateNode({
+      ollama: mockOllama("should not be called"),
+      fs: mockFs(),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      now: () => TICK_L3_ELIGIBLE,
+    });
+    await node();
+
+    const bucketKey = "2026-04-15T06";
+    const item = await store.get(["memory", "L3"], bucketKey);
+    expect(item).toBeNull();
+  });
+
+  test("catch-up: multiple past buckets all written in one tick", async () => {
+    // Seed two buckets: 2026-04-15T06 and 2026-04-15T00
+    const bucket00L2 = [
+      { content: "early hour summary", windowStart: "2026-04-15T00:00:00.000Z", windowEnd: "2026-04-15T01:00:00.000Z", sourceCount: 2 },
+    ];
+    await seedL2(store, l2EntriesForBucket);           // bucket T06
+    await seedL2(store, bucket00L2);                   // bucket T00
+
+    // now = T18:01, so both T00 bucket (T00+6h+6h = T12 <= T18:01) and T06 bucket (T06+6h+6h = T18 <= T18:01) are eligible
+    const node = createLayerUpdateNode({
+      ollama: mockOllama("summary"),
+      fs: mockFs(),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      now: () => TICK_L3_ELIGIBLE,
+    });
+    await node();
+
+    const results = await store.search(["memory", "L3"], { limit: 100 });
+    const l3Keys = results.map((r: { key: string }) => r.key);
+    expect(l3Keys).toContain("2026-04-15T06");
+    expect(l3Keys).toContain("2026-04-15T00");
+  });
+});
+
 describe("createLayerUpdateNode — L2 hourly rollup", () => {
   let store: InMemoryStore;
   beforeEach(() => { store = new InMemoryStore(); });
@@ -62,6 +211,7 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
       logDir: "./logs",
       store,
       l2DelayHours: 1,
+      l3DelayHours: 9999,
       now: () => TICK_ELIGIBLE,
     });
     await node();
@@ -83,6 +233,7 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
       logDir: "./logs",
       store,
       l2DelayHours: 1,
+      l3DelayHours: 9999,
       now: () => TICK_NOT_YET,
     });
     await node();
@@ -113,6 +264,7 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
       logDir: "./logs",
       store,
       l2DelayHours: 1,
+      l3DelayHours: 9999,
       now: () => TICK_ELIGIBLE,
     });
     await node();
@@ -130,6 +282,7 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
       logDir: "./logs",
       store,
       l2DelayHours: 1,
+      l3DelayHours: 9999,
       now: () => TICK_ELIGIBLE,
     });
     await node();
@@ -157,6 +310,7 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
       logDir: "./logs",
       store,
       l2DelayHours: 1,
+      l3DelayHours: 9999,
       now: () => TICK_ELIGIBLE,
     });
     await node();

@@ -38,6 +38,8 @@ export function createCollectFeedbackNode(deps: CollectFeedbackDeps) {
       );
 
       if (replies.length === 0) return {};
+
+      console.log(`[User Feedback]\n${replies.length} replies collected`);
       return { userFeedback: replies };
     } catch (err) {
       console.error(

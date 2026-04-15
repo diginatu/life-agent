@@ -98,6 +98,7 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     logDir: s.logDir,
     store,
     l2DelayHours: s.l2DelayHours,
+    l3DelayHours: s.l3DelayHours,
     now: deps.now,
   });
 

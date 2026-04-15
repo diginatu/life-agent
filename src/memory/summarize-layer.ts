@@ -8,6 +8,6 @@ export async function summarizeLayer(
   windowLabel: string,
 ): Promise<string> {
   const { history } = formatHistory(entries);
-  const prompt = `Summarize the activity log for time window "${windowLabel}". Write 2-3 concise sentences describing what the person was doing, their posture, and any notable events or actions.\n\nActivity log:\n${history}`;
+  const prompt = `Summarize the activity log for time window "${windowLabel}". Write 2-3 concise sentences describing what the person was doing, their posture, and any notable events, actions or user information.\n\nActivity log:\n${history}`;
   return ollama.generate(prompt);
 }

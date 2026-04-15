@@ -39,6 +39,9 @@ settings:
   # Hours to delay L2 hourly rollup (keep recent logs in L1)
   l2DelayHours: 1
 
+  # Hours to delay L3 6-hour bucket rollup (keep recent L2 entries unmerged)
+  l3DelayHours: 6
+
 # Action definitions
 # - active: true = triggers Discord notification; false = logged only, no notification
 # - description: seed value for LLM context; evolved at runtime via memory store
