@@ -22,6 +22,7 @@ export interface LayerUpdateNodeDeps {
   l3MaxRetention: number;
   l4MaxChars?: number;
   l4UpdatePrompt?: string;
+  maxScanDays?: number;
   now?: () => Date;
 }
 
@@ -53,11 +54,12 @@ const L2_NAMESPACE = ["memory", "L2"] as const;
 const L3_NAMESPACE = ["memory", "L3"] as const;
 const L3_BUCKET_MS = 6 * 3600000;
 const L3_BUCKET_HOURS = [0, 6, 12, 18];
-const MAX_SCAN_DAYS = 7;
+const DEFAULT_MAX_SCAN_DAYS = 14;
 
 export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
   return async (): Promise<Record<string, never>> => {
     const now = (deps.now ?? (() => new Date()))();
+    const maxScanDays = deps.maxScanDays ?? DEFAULT_MAX_SCAN_DAYS;
 
     // Fetch existing L2 keys to skip
     const existingL2 = await deps.store.search(L2_NAMESPACE as unknown as string[], { limit: 10000 });
@@ -70,10 +72,11 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
     // Floor to hour
     cutoff.setMinutes(0, 0, 0);
 
-    // Scan start: MAX_SCAN_DAYS ago, floored to hour
-    const scanStart = new Date(now.getTime() - MAX_SCAN_DAYS * 86400000);
+    // Scan start: maxScanDays ago, floored to hour
+    const scanStart = new Date(now.getTime() - maxScanDays * 86400000);
     scanStart.setMinutes(0, 0, 0);
 
+    // --- Phase 1: Create all missing L2 entries (no eviction yet) ---
     for (let h = new Date(scanStart); h <= cutoff; h = new Date(h.getTime() + 3600000)) {
       const key = toLocalHourKey(h);
       if (existingKeys.has(key)) {
@@ -113,23 +116,9 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         windowEnd: hEnd,
         sourceCount: entries.length,
       });
-
-      // Evict oldest L2 entries if over retention limit
-      const allL2AfterWrite = await deps.store.search(L2_NAMESPACE as unknown as string[], { limit: 10000 });
-      if (allL2AfterWrite.length > deps.l2MaxRetention) {
-        const sorted = [...allL2AfterWrite].sort((a, b) => {
-          const aWs = (a.value as { windowStart?: string }).windowStart ?? "";
-          const bWs = (b.value as { windowStart?: string }).windowStart ?? "";
-          return aWs < bWs ? -1 : aWs > bWs ? 1 : 0;
-        });
-        const toEvict = sorted.slice(0, allL2AfterWrite.length - deps.l2MaxRetention);
-        for (const item of toEvict) {
-          await deps.store.delete(L2_NAMESPACE as unknown as string[], item.key);
-        }
-      }
     }
 
-    // --- L3: 6-hour bucket rollup ---
+    // --- Phase 2: L3 6-hour bucket rollup (consumes L2 before eviction) ---
     const existingL3 = await deps.store.search(L3_NAMESPACE as unknown as string[], { limit: 10000 });
     const existingL3Keys = new Set(existingL3.map((item: { key: string }) => item.key));
 
@@ -137,8 +126,8 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
     const l3CutoffMs = now.getTime() - (L3_BUCKET_MS + deps.l3DelayHours * 3600000);
     const l3Cutoff = toL3BucketStart(new Date(l3CutoffMs));
 
-    // L3 scan start: MAX_SCAN_DAYS ago, aligned to a bucket
-    const l3ScanStart = toL3BucketStart(new Date(now.getTime() - MAX_SCAN_DAYS * 86400000));
+    // L3 scan start: maxScanDays ago, aligned to a bucket
+    const l3ScanStart = toL3BucketStart(new Date(now.getTime() - maxScanDays * 86400000));
 
     for (let b = new Date(l3ScanStart); b <= l3Cutoff; b = new Date(b.getTime() + L3_BUCKET_MS)) {
       const bucketKey = toL3BucketKey(b);
@@ -208,6 +197,20 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
 
           await deps.store.delete(L3_NAMESPACE as unknown as string[], item.key);
         }
+      }
+    }
+
+    // --- Phase 3: L2 eviction (safe — L3 has already consumed what it needs) ---
+    const allL2Final = await deps.store.search(L2_NAMESPACE as unknown as string[], { limit: 10000 });
+    if (allL2Final.length > deps.l2MaxRetention) {
+      const sorted = [...allL2Final].sort((a, b) => {
+        const aWs = (a.value as { windowStart?: string }).windowStart ?? "";
+        const bWs = (b.value as { windowStart?: string }).windowStart ?? "";
+        return aWs < bWs ? -1 : aWs > bWs ? 1 : 0;
+      });
+      const toEvict = sorted.slice(0, allL2Final.length - deps.l2MaxRetention);
+      for (const item of toEvict) {
+        await deps.store.delete(L2_NAMESPACE as unknown as string[], item.key);
       }
     }
 

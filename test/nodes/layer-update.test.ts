@@ -433,6 +433,120 @@ describe("createLayerUpdateNode — retention eviction", () => {
   });
 });
 
+describe("createLayerUpdateNode — L2 eviction deferred until after L3", () => {
+  let store: InMemoryStore;
+  beforeEach(() => { store = new InMemoryStore(); });
+
+  test("L3 consumes L2 entries before eviction during multi-day catch-up", async () => {
+    // Scenario: 4 hours of L1 data across 2 L3 buckets, l2MaxRetention=2.
+    // Old code evicts L2 per-write → L3 for bucket T00 finds no L2 entries.
+    // Fixed code defers eviction → L3 for both buckets gets created.
+    const l1Entries: Record<string, unknown[]> = {
+      "2026-04-15": [
+        { timestamp: "2026-04-15T01:05:00.000Z", summary: { activityGuess: "sleep", posture: "lying" }, decision: { action: "none", reason: "r" } },
+        { timestamp: "2026-04-15T02:10:00.000Z", summary: { activityGuess: "sleep", posture: "lying" }, decision: { action: "none", reason: "r" } },
+        { timestamp: "2026-04-15T07:15:00.000Z", summary: { activityGuess: "coding", posture: "sitting" }, decision: { action: "none", reason: "r" } },
+        { timestamp: "2026-04-15T08:20:00.000Z", summary: { activityGuess: "coding", posture: "sitting" }, decision: { action: "none", reason: "r" } },
+      ],
+    };
+
+    const node = createLayerUpdateNode({
+      ollama: mockOllama("summary"),
+      fs: mockFs(l1Entries),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      l2MaxRetention: 2,
+      l3MaxRetention: 9999,
+      now: () => new Date("2026-04-15T18:01:00.000Z"),
+    });
+    await node();
+
+    // Both L3 buckets should be created
+    const l3Results = await store.search(["memory", "L3"], { limit: 100 });
+    const l3Keys = l3Results.map((r: { key: string }) => r.key);
+    expect(l3Keys).toContain("2026-04-15T00"); // bucket T00-T06
+    expect(l3Keys).toContain("2026-04-15T06"); // bucket T06-T12
+  });
+
+  test("L2 eviction still occurs after L3, respecting retention limit", async () => {
+    const l1Entries: Record<string, unknown[]> = {
+      "2026-04-15": [
+        { timestamp: "2026-04-15T01:05:00.000Z", summary: { activityGuess: "a", posture: "p" }, decision: { action: "none", reason: "r" } },
+        { timestamp: "2026-04-15T02:10:00.000Z", summary: { activityGuess: "a", posture: "p" }, decision: { action: "none", reason: "r" } },
+        { timestamp: "2026-04-15T07:15:00.000Z", summary: { activityGuess: "a", posture: "p" }, decision: { action: "none", reason: "r" } },
+        { timestamp: "2026-04-15T08:20:00.000Z", summary: { activityGuess: "a", posture: "p" }, decision: { action: "none", reason: "r" } },
+      ],
+    };
+
+    const node = createLayerUpdateNode({
+      ollama: mockOllama("summary"),
+      fs: mockFs(l1Entries),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      l2MaxRetention: 2,
+      l3MaxRetention: 9999,
+      now: () => new Date("2026-04-15T18:01:00.000Z"),
+    });
+    await node();
+
+    // After run, L2 should be capped at l2MaxRetention=2
+    const l2Results = await store.search(["memory", "L2"], { limit: 10000 });
+    expect(l2Results).toHaveLength(2);
+
+    // Oldest entries (T01, T02) should be evicted, newest (T07, T08) remain
+    const l2Keys = l2Results.map((r: { key: string }) => r.key);
+    expect(l2Keys).toContain(localHourKey(new Date("2026-04-15T07:00:00.000Z")));
+    expect(l2Keys).toContain(localHourKey(new Date("2026-04-15T08:00:00.000Z")));
+  });
+});
+
+describe("createLayerUpdateNode — maxScanDays", () => {
+  let store: InMemoryStore;
+  beforeEach(() => { store = new InMemoryStore(); });
+
+  test("maxScanDays controls how far back L2 scan reaches", async () => {
+    // Entry 9 days ago. Default MAX_SCAN_DAYS=7 would miss it; maxScanDays=10 should find it.
+    const now = new Date("2026-04-15T18:01:00.000Z");
+    const nineDaysAgo = new Date(now.getTime() - 9 * 86400000);
+    const dateStr = nineDaysAgo.toISOString().slice(0, 10);
+    const hourStr = nineDaysAgo.toISOString().slice(11, 13);
+    const entryTimestamp = new Date(nineDaysAgo.getTime() + 5 * 60000).toISOString(); // +5min
+
+    const l1Entries: Record<string, unknown[]> = {
+      [dateStr]: [
+        { timestamp: entryTimestamp, summary: { activityGuess: "reading", posture: "sitting" }, decision: { action: "none", reason: "r" } },
+      ],
+    };
+
+    const node = createLayerUpdateNode({
+      ollama: mockOllama("old summary"),
+      fs: mockFs(l1Entries),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
+      maxScanDays: 10,
+      now: () => now,
+    });
+    await node();
+
+    // Should find L2 entry for that old hour
+    const results = await store.search(["memory", "L2"], { limit: 10000 });
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    // Verify at least one entry has the old date
+    const hasOldEntry = results.some((r: { value: { windowStart?: string } }) =>
+      r.value.windowStart?.startsWith(dateStr)
+    );
+    expect(hasOldEntry).toBe(true);
+  });
+});
+
 describe("createLayerUpdateNode — L2 hourly rollup", () => {
   let store: InMemoryStore;
   beforeEach(() => { store = new InMemoryStore(); });

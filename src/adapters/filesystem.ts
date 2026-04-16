@@ -6,7 +6,7 @@ export interface FilesystemAdapter {
   readLastNLines(dir: string, date: string, n: number): Promise<unknown[]>;
   readLastNLinesAcrossDays(dir: string, date: string, n: number, maxDaysBack?: number): Promise<unknown[]>;
   readAllLinesForDay(dir: string, date: string): Promise<unknown[]>;
-  readEntriesSince(logDir: string, sinceIso: string): Promise<unknown[]>;
+  readEntriesSince(logDir: string, sinceIso: string, maxDays?: number): Promise<unknown[]>;
 }
 
 export function createFilesystemAdapter(): FilesystemAdapter {
@@ -48,10 +48,9 @@ export function createFilesystemAdapter(): FilesystemAdapter {
         .map((line) => JSON.parse(line));
     },
 
-    async readEntriesSince(logDir, sinceIso) {
+    async readEntriesSince(logDir, sinceIso, maxDays = 14) {
       const result: unknown[] = [];
       const today = new Date();
-      const maxDays = 7;
 
       for (let i = 0; i <= maxDays; i++) {
         const d = new Date(today);

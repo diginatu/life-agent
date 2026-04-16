@@ -22,6 +22,7 @@ const SettingsSchema = z.object({
   l3MaxRetention: z.number().int().positive().default(28),
   l4MaxChars: z.number().int().positive().default(DEFAULT_L4_MAX_CHARS),
   l4UpdatePrompt: z.string().default(DEFAULT_L4_PROMPT),
+  maxScanDays: z.number().int().positive().default(14),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
