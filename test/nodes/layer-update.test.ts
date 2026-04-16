@@ -302,6 +302,103 @@ describe("createLayerUpdateNode — retention eviction", () => {
     expect(keys).toContain("2026-04-15T06");
   });
 
+  test("L3 eviction: distills evicted L3 entries into L4 persistent memory", async () => {
+    const l3MaxRetention = 1;
+    // Seed 2 old L3 entries — one will be evicted
+    await store.put(["memory", "L3"], "2026-04-12T00", {
+      content: "old summary A",
+      windowStart: "2026-04-12T00:00:00.000Z",
+      windowEnd: "2026-04-12T06:00:00.000Z",
+      sourceCount: 1,
+    });
+    await store.put(["memory", "L3"], "2026-04-12T06", {
+      content: "old summary B",
+      windowStart: "2026-04-12T06:00:00.000Z",
+      windowEnd: "2026-04-12T12:00:00.000Z",
+      sourceCount: 1,
+    });
+    // Seed L2 for bucket T06 so a new L3 is written this tick
+    await seedL2(store, l2EntriesForBucket);
+
+    const l4Prompts: string[] = [];
+    const l4Ollama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        if (prompt.includes("PERSISTENT_MEMORY_PROMPT")) {
+          l4Prompts.push(prompt);
+          return `L4 rev ${l4Prompts.length}`;
+        }
+        return "summary text";
+      },
+      generateWithImage: async () => "",
+    };
+
+    const node = createLayerUpdateNode({
+      ollama: l4Ollama,
+      fs: mockFs(),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention,
+      l4MaxChars: 2000,
+      l4UpdatePrompt: "PERSISTENT_MEMORY_PROMPT cur={l4Current} evict={l3Content} ws={l3WindowStart} we={l3WindowEnd}",
+      now: () => TICK_L3_ELIGIBLE,
+    });
+    await node();
+
+    // Two entries evicted (started with 2 old + 1 new = 3, limit 1 → evict oldest 2)
+    expect(l4Prompts).toHaveLength(2);
+    // First eviction: oldest L3 entry, empty current L4
+    expect(l4Prompts[0]).toContain("cur=");
+    expect(l4Prompts[0]).toContain("evict=old summary A");
+    expect(l4Prompts[0]).toContain("ws=2026-04-12T00:00:00.000Z");
+    // Second eviction: current L4 is "L4 rev 1"
+    expect(l4Prompts[1]).toContain("cur=L4 rev 1");
+    expect(l4Prompts[1]).toContain("evict=old summary B");
+
+    // L4 store entry
+    const l4 = await store.get(["memory", "L4"], "current");
+    expect(l4).not.toBeNull();
+    expect(l4!.value.content).toBe("L4 rev 2");
+    expect(l4!.value.sourceCount).toBe(2);
+    expect(typeof l4!.value.updatedAt).toBe("string");
+
+    // L3 count respects retention
+    const l3After = await store.search(["memory", "L3"], { limit: 100 });
+    expect(l3After).toHaveLength(l3MaxRetention);
+  });
+
+  test("no L4 update when nothing evicted", async () => {
+    await seedL2(store, l2EntriesForBucket);
+    let l4Called = false;
+    const ollama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        if (prompt.includes("PERSISTENT_MEMORY_PROMPT")) l4Called = true;
+        return "x";
+      },
+      generateWithImage: async () => "",
+    };
+    const node = createLayerUpdateNode({
+      ollama,
+      fs: mockFs(),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
+      l4MaxChars: 2000,
+      l4UpdatePrompt: "PERSISTENT_MEMORY_PROMPT {l4Current} {l3Content}",
+      now: () => TICK_L3_ELIGIBLE,
+    });
+    await node();
+
+    expect(l4Called).toBe(false);
+    const l4 = await store.get(["memory", "L4"], "current");
+    expect(l4).toBeNull();
+  });
+
   test("no eviction when count is at or under limit", async () => {
     // Seed exactly l2MaxRetention entries; after writing one new entry that already exists,
     // count stays at max and no eviction occurs

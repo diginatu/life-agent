@@ -3,6 +3,13 @@ import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { BaseStore } from "@langchain/langgraph";
 import type { LogEntry } from "./history-format.ts";
 import { summarizeLayer } from "../memory/summarize-layer.ts";
+import { updateL4, type EvictedL3Entry } from "../memory/update-l4.ts";
+import {
+  DEFAULT_L4_MAX_CHARS,
+  DEFAULT_L4_PROMPT,
+  L4_KEY,
+  L4_NAMESPACE,
+} from "../memory/constants.ts";
 
 export interface LayerUpdateNodeDeps {
   ollama: OllamaAdapter;
@@ -13,6 +20,8 @@ export interface LayerUpdateNodeDeps {
   l3DelayHours: number;
   l2MaxRetention: number;
   l3MaxRetention: number;
+  l4MaxChars?: number;
+  l4UpdatePrompt?: string;
   now?: () => Date;
 }
 
@@ -164,7 +173,6 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         sourceCount: l2Items.length,
       });
 
-      // Evict oldest L3 entries if over retention limit
       const allL3AfterWrite = await deps.store.search(L3_NAMESPACE as unknown as string[], { limit: 10000 });
       if (allL3AfterWrite.length > deps.l3MaxRetention) {
         const sorted = [...allL3AfterWrite].sort((a, b) => {
@@ -173,7 +181,31 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
           return aWs < bWs ? -1 : aWs > bWs ? 1 : 0;
         });
         const toEvict = sorted.slice(0, allL3AfterWrite.length - deps.l3MaxRetention);
+
+        const existingL4 = await deps.store.get(L4_NAMESPACE as unknown as string[], L4_KEY);
+        let l4Content = (existingL4?.value as { content?: string } | null)?.content ?? "";
+        let l4SourceCount = (existingL4?.value as { sourceCount?: number } | null)?.sourceCount ?? 0;
+
         for (const item of toEvict) {
+          const evicted = item.value as EvictedL3Entry;
+          const newContent = await updateL4(
+            deps.ollama,
+            l4Content,
+            evicted,
+            deps.l4UpdatePrompt ?? DEFAULT_L4_PROMPT,
+            deps.l4MaxChars ?? DEFAULT_L4_MAX_CHARS,
+          );
+
+          if (newContent !== l4Content) {
+            l4Content = newContent;
+            l4SourceCount += 1;
+            await deps.store.put(L4_NAMESPACE as unknown as string[], L4_KEY, {
+              content: l4Content,
+              updatedAt: now.toISOString(),
+              sourceCount: l4SourceCount,
+            });
+          }
+
           await deps.store.delete(L3_NAMESPACE as unknown as string[], item.key);
         }
       }

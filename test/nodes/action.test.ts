@@ -707,6 +707,104 @@ describe("action node with L2/L3 memory layers", () => {
     expect(capturedSince).toBe("2026-04-14T08:00:00.000Z");
   });
 
+  test("L4 persistent memory: appears above 6-hour overview in prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const store = new InMemoryStore();
+    await store.put(["memory", "L4"], "current", {
+      content: "user prefers short break nudges; sleeps ~23:30",
+      updatedAt: "2026-04-14T06:00:00.000Z",
+      sourceCount: 3,
+    });
+    await store.put(["memory", "L3"], "2026-04-14T00", {
+      content: "L3 overview content",
+      windowStart: "2026-04-14T00:00:00.000Z",
+      windowEnd: "2026-04-14T06:00:00.000Z",
+      sourceCount: 5,
+    });
+
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFsWithSince([], []),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      now: () => new Date("2026-04-14T09:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).toContain("Persistent memory");
+    expect(capturedPrompt).toContain("user prefers short break nudges; sleeps ~23:30");
+    const l4Idx = capturedPrompt.indexOf("Persistent memory");
+    const l3Idx = capturedPrompt.indexOf("6-hour overview");
+    expect(l4Idx).toBeGreaterThan(-1);
+    expect(l3Idx).toBeGreaterThan(-1);
+    expect(l4Idx).toBeLessThan(l3Idx);
+  });
+
+  test("L4 absent: no Persistent memory section", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const store = new InMemoryStore();
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFsWithSince([], []),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      now: () => new Date("2026-04-14T10:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).not.toContain("Persistent memory");
+  });
+
+  test("L4 with empty content: no Persistent memory section", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validActionJson;
+      },
+      generateWithImage: async () => validActionJson,
+    };
+
+    const store = new InMemoryStore();
+    await store.put(["memory", "L4"], "current", {
+      content: "",
+      updatedAt: "2026-04-14T06:00:00.000Z",
+      sourceCount: 0,
+    });
+    const node = createActionNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFsWithSince([], []),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      now: () => new Date("2026-04-14T10:00:00.000Z"),
+    });
+    await node(makeState());
+
+    expect(capturedPrompt).not.toContain("Persistent memory");
+  });
+
   test("All empty: L3/L2/L1 sections all omitted", async () => {
     let capturedPrompt = "";
     const capturingOllama: OllamaAdapter = {

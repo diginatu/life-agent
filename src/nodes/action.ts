@@ -11,6 +11,7 @@ import {
   type LogEntry,
   type UserFeedbackEntry,
 } from "./history-format.ts";
+import { L4_KEY, L4_NAMESPACE } from "../memory/constants.ts";
 
 interface ActionNodeDeps {
   ollama: OllamaAdapter;
@@ -56,6 +57,7 @@ function buildPrompt(
   summary: SceneSummary,
   actionsConfig: Config,
   currentTime: Date,
+  l4Content: string | null,
   l3Entries: LayerEntry[],
   l2Entries: LayerEntry[],
   logEntries?: LogEntry[],
@@ -71,6 +73,11 @@ function buildPrompt(
 
   let historySections = "";
   historySections += formatUserFeedback(userFeedback);
+
+  const trimmedL4 = l4Content?.trim() ?? "";
+  if (trimmedL4.length > 0) {
+    historySections += `\nPersistent memory:\n${trimmedL4}\n`;
+  }
 
   if (l3Entries.length > 0) {
     historySections += "\n6-hour overview:\n";
@@ -129,6 +136,11 @@ export function createActionNode(deps: ActionNodeDeps) {
     const currentTime = now();
     const l2DelayHours = deps.l2DelayHours ?? 1;
 
+    const l4Item = deps.store
+      ? await deps.store.get(L4_NAMESPACE as unknown as string[], L4_KEY)
+      : null;
+    const l4Content = (l4Item?.value as { content?: string } | null)?.content ?? null;
+
     // Read L3 entries
     const allL3Items = deps.store
       ? await deps.store.search(["memory", "L3"], { limit: 10000 })
@@ -177,6 +189,7 @@ export function createActionNode(deps: ActionNodeDeps) {
       state.summary,
       deps.actionsConfig,
       currentTime,
+      l4Content,
       allL3,
       filteredL2,
       logEntries,

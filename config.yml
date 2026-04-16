@@ -45,6 +45,9 @@ settings:
   # Maximum number of L3 6-hour entries to keep in store
   l3MaxRetention: 28
 
+  # L4 persistent memory: max char size of the distilled text
+  l4MaxChars: 2000
+
 # Action definitions
 # - active: true = triggers Discord notification; false = logged only, no notification
 # - description: seed value for LLM context; evolved at runtime via memory store

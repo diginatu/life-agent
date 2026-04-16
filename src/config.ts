@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { parse as parseYaml } from "yaml";
+import { DEFAULT_L4_MAX_CHARS, DEFAULT_L4_PROMPT } from "./memory/constants.ts";
 
 const SettingsSchema = z.object({
   webcamDevice: z.string().default("/dev/video0"),
@@ -19,6 +20,8 @@ const SettingsSchema = z.object({
   l3DelayHours: z.number().int().nonnegative().default(6),
   l2MaxRetention: z.number().int().positive().default(48),
   l3MaxRetention: z.number().int().positive().default(28),
+  l4MaxChars: z.number().int().positive().default(DEFAULT_L4_MAX_CHARS),
+  l4UpdatePrompt: z.string().default(DEFAULT_L4_PROMPT),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;

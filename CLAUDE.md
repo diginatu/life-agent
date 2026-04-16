@@ -13,12 +13,13 @@ Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore fo
 - **Adapter DI**: External services (Ollama, filesystem, ffmpeg, Discord) injected as interfaces. `--dry-run` uses mocks.
 - **Config**: Zod-validated YAML (`config.yml` + `config.local.yml` override). Actions are data-driven.
 - **Discord reply loop**: `CollectFeedback` node reads the last log entry's Discord cursor (`discordMessageId` or `discordLastSeenMessageId`), fetches replies via `discord.collectReplies`, and puts them on `state.userFeedback`. The `Action` node injects those replies into the LLM prompt in the same run (no multi-run delay). `Persist` writes them back to the log entry as `feedbackFromPrevious` for audit / history.
-- **3-layer time-windowed memory**:
+- **4-layer time-windowed memory**:
   - **L1** — raw JSONL log entries in `logs/`. Read from latest L2 `windowEnd` to now (no count cap).
   - **L2** — hourly LLM summary, delayed by `l2DelayHours` (default 1h) so recent logs stay in L1. Keyed by local-time hour `YYYY-MM-DDTHH`. Capped at `l2MaxRetention` entries (default 48 ≈ 2 days).
   - **L3** — 6-hour LLM summary of L2 entries, delayed by `l3DelayHours` (default 6h). Buckets aligned to 00/06/12/18 UTC. Capped at `l3MaxRetention` entries (default 28 ≈ 7 days).
-  All three layers are injected into the Action prompt with no gap. `LayerUpdate` node runs each tick and catches up missed windows after sleep.
-  Stored in `{memoryDir}/store.json` under namespaces `["memory","L2"]` and `["memory","L3"]`.
+  - **L4** — single persistent-memory text (one entry at `["memory","L4"]` key `"current"`). On each L3 eviction, an LLM merges the current L4 text with the about-to-be-deleted L3 entry to produce a new concise distillation. Bounded by `l4MaxChars` (default 2000). Never auto-expires — only rewritten.
+  All four layers are injected into the Action prompt (L4 → L3 → L2 → L1, no gap). `LayerUpdate` node runs each tick and catches up missed windows after sleep.
+  Stored in `{memoryDir}/store.json` under namespaces `["memory","L2"]`, `["memory","L3"]`, and `["memory","L4"]`.
 - **Sprint convention**: Commits follow `feat: <description> (Sprint N)`.
 
 Default to using Bun instead of Node.js.
