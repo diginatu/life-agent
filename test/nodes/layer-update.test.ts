@@ -102,6 +102,36 @@ describe("createLayerUpdateNode — L3 6-hour bucket rollup", () => {
     expect(item!.value.windowEnd).toBe(L3_BUCKET_B_END.toISOString());
   });
 
+  test("L3 prompt includes L2 content text, not raw LogEntry fields", async () => {
+    await seedL2(store, l2EntriesForBucket);
+    const capturedPrompts: string[] = [];
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt: string) => { capturedPrompts.push(prompt); return "6h summary"; },
+      generateWithImage: async () => "",
+    };
+    const node = createLayerUpdateNode({
+      ollama: capturingOllama,
+      fs: mockFs(),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 9999,
+      now: () => TICK_L3_ELIGIBLE,
+    });
+    await node();
+
+    // Find the L3 summarization prompt (not L2 — there are no L1 entries to trigger L2)
+    expect(capturedPrompts.length).toBeGreaterThanOrEqual(1);
+    const l3Prompt = capturedPrompts[capturedPrompts.length - 1]!;
+    // Must contain L2 content strings
+    expect(l3Prompt).toContain("l2 hour 06 summary");
+    expect(l3Prompt).toContain("l2 hour 07 summary");
+    // Must NOT contain "unknown" fallback from formatHistory misapplied to L2 items
+    expect(l3Prompt).not.toContain("unknown, unknown");
+  });
+
   test("not-yet tick: no L3 write when delay has not elapsed", async () => {
     await seedL2(store, l2EntriesForBucket);
     const node = createLayerUpdateNode({
@@ -513,7 +543,6 @@ describe("createLayerUpdateNode — maxScanDays", () => {
     const now = new Date("2026-04-15T18:01:00.000Z");
     const nineDaysAgo = new Date(now.getTime() - 9 * 86400000);
     const dateStr = nineDaysAgo.toISOString().slice(0, 10);
-    const hourStr = nineDaysAgo.toISOString().slice(11, 13);
     const entryTimestamp = new Date(nineDaysAgo.getTime() + 5 * 60000).toISOString(); // +5min
 
     const l1Entries: Record<string, unknown[]> = {

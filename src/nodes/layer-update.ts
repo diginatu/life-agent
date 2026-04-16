@@ -2,7 +2,7 @@ import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { BaseStore } from "@langchain/langgraph";
 import type { LogEntry } from "./history-format.ts";
-import { summarizeLayer } from "../memory/summarize-layer.ts";
+import { summarizeLayer, summarizeL3 } from "../memory/summarize-layer.ts";
 import { updateL4, type EvictedL3Entry } from "../memory/update-l4.ts";
 import {
   DEFAULT_L4_MAX_CHARS,
@@ -153,7 +153,7 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         continue;
       }
 
-      const content = await summarizeLayer(deps.ollama, l2Items as unknown as Parameters<typeof summarizeLayer>[1], bucketKey);
+      const content = await summarizeL3(deps.ollama, l2Items, bucketKey);
 
       await deps.store.put(L3_NAMESPACE as unknown as string[], bucketKey, {
         content,
