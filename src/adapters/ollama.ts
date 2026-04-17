@@ -1,5 +1,5 @@
-import { ChatOllama } from "@langchain/ollama";
 import { HumanMessage } from "@langchain/core/messages";
+import { ChatOllama } from "@langchain/ollama";
 
 export interface OllamaAdapter {
   generate(prompt: string, options?: { format?: Record<string, unknown> }): Promise<string>;
@@ -26,7 +26,10 @@ export function createOllamaAdapter(invoker: LlmInvoker): OllamaAdapter {
     async generate(prompt, options) {
       console.log(`[LLM prompt]\n${prompt}`);
       const message = new HumanMessage({ content: prompt });
-      const response = await invoker.invoke([message], options?.format ? { format: options.format } : undefined);
+      const response = await invoker.invoke(
+        [message],
+        options?.format ? { format: options.format } : undefined,
+      );
       const result = String(response.content);
       console.log(`[LLM response]\n${result}`);
       return result;
@@ -34,7 +37,9 @@ export function createOllamaAdapter(invoker: LlmInvoker): OllamaAdapter {
 
     async generateWithImage(prompt, imageBase64) {
       const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
-      console.log(`[LLM prompt] (with ${images.length} image${images.length === 1 ? "" : "s"})\n${prompt}`);
+      console.log(
+        `[LLM prompt] (with ${images.length} image${images.length === 1 ? "" : "s"})\n${prompt}`,
+      );
       const message = new HumanMessage({
         content: [
           { type: "text", text: prompt },

@@ -1,8 +1,8 @@
 import type { OllamaAdapter } from "../adapters/ollama.ts";
-import { DraftMessageSchema, type DraftMessage } from "../schemas/message.ts";
-import type { SceneSummary } from "../schemas/summary.ts";
-import type { ActionSelection } from "../schemas/action.ts";
 import type { Config } from "../config.ts";
+import type { ActionSelection } from "../schemas/action.ts";
+import { type DraftMessage, DraftMessageSchema } from "../schemas/message.ts";
+import type { SceneSummary } from "../schemas/summary.ts";
 import { formatUserFeedback, type UserFeedbackEntry } from "./history-format.ts";
 
 interface MessageNodeDeps {
@@ -29,7 +29,13 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-function buildPrompt(summary: SceneSummary, decision: ActionSelection, responseStyle: string, actionDescription?: string, userFeedback?: UserFeedbackEntry[]): string {
+function buildPrompt(
+  summary: SceneSummary,
+  decision: ActionSelection,
+  responseStyle: string,
+  actionDescription?: string,
+  userFeedback?: UserFeedbackEntry[],
+): string {
   const descLine = actionDescription ? `\n- Action description: ${actionDescription}` : "";
   const feedbackSection = formatUserFeedback(userFeedback);
   return `You are a personal assistant. Draft a mention post for the user according to the context.
@@ -55,8 +61,9 @@ export function createMessageNode(deps: MessageNodeDeps) {
   const { actionsConfig } = deps;
 
   function getFallback(action: string): DraftMessage {
-    return actionsConfig.getFallbackMessage(action)
-      ?? { body: "Life Agent has a suggestion for you." };
+    return (
+      actionsConfig.getFallbackMessage(action) ?? { body: "Life Agent has a suggestion for you." }
+    );
   }
 
   return async (state: MessageNodeState): Promise<MessageNodeResult> => {

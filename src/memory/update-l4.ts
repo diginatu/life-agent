@@ -20,7 +20,9 @@ export async function updateL4(
     .replaceAll("{l3WindowEnd}", evictedL3.windowEnd)
     .replaceAll("{l4MaxChars}", String(maxChars));
 
-  console.log(`[layer-update] L4 update from expiring L3 [${evictedL3.windowStart}..${evictedL3.windowEnd}]`);
+  console.log(
+    `[layer-update] L4 update from expiring L3 [${evictedL3.windowStart}..${evictedL3.windowEnd}]`,
+  );
   const raw = await ollama.generate(prompt);
   const trimmed = raw.trim();
   return trimmed.length > maxChars ? trimmed.slice(0, maxChars) : trimmed;

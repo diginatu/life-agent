@@ -1,5 +1,5 @@
-import { z } from "zod/v4";
 import { parse as parseYaml } from "yaml";
+import { z } from "zod/v4";
 import { DEFAULT_L4_MAX_CHARS, DEFAULT_L4_PROMPT } from "./memory/constants.ts";
 
 const SettingsSchema = z.object({
@@ -99,7 +99,6 @@ export function loadConfig(yamlContent: string): Config {
     isActiveAction(action: string) {
       return raw.actions[action]?.active === true;
     },
-
   };
 }
 

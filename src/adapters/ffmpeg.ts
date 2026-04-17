@@ -17,11 +17,16 @@ export function createFfmpegAdapter(spawn: SpawnFn = Bun.spawn): FfmpegAdapter {
       const args = [
         "ffmpeg",
         "-y",
-        "-f", "v4l2",
-        "-video_size", `${width}x${height}`,
-        "-i", device,
-        "-vf", "select='gte(t,3)',setpts=PTS-STARTPTS",  // drop first 3s (camera warmup)
-        "-frames:v", "1",
+        "-f",
+        "v4l2",
+        "-video_size",
+        `${width}x${height}`,
+        "-i",
+        device,
+        "-vf",
+        "select='gte(t,3)',setpts=PTS-STARTPTS", // drop first 3s (camera warmup)
+        "-frames:v",
+        "1",
         outputPath,
       ];
 

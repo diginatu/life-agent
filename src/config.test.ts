@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test";
+import { expect, test } from "bun:test";
 import { loadConfig } from "./config.ts";
 
 const minimalYaml = `
@@ -50,4 +50,3 @@ actions:
   const config = loadConfig(yaml);
   expect(config.settings.discordChannelId).toBe("123456789");
 });
-

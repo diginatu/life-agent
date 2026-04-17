@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:docs.langchain.com)"
+      "WebFetch(domain:docs.langchain.com)",
+      "WebFetch(domain:registry.npmjs.org)"
     ]
   }
 }

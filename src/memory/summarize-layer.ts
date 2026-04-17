@@ -27,10 +27,10 @@ export async function summarizeL3(
   l2Entries: L2Entry[],
   windowLabel: string,
 ): Promise<string> {
-  const lines = l2Entries
-    .map((e) => `[${e.windowStart}] ${e.content}`)
-    .join("\n");
+  const lines = l2Entries.map((e) => `[${e.windowStart}] ${e.content}`).join("\n");
   const prompt = `Summarize the following hourly summaries for time window "${windowLabel}". Write 2-5 concise sentences describing what the person was doing, their posture, and any notable events, actions or user information. Keep the detail like time, number, name or action for important information.\n\nHourly summaries:\n${lines}`;
-  console.log(`[layer-update] Summarizing L3 window "${windowLabel}" (${l2Entries.length} L2 entries)`);
+  console.log(
+    `[layer-update] Summarizing L3 window "${windowLabel}" (${l2Entries.length} L2 entries)`,
+  );
   return ollama.generate(prompt);
 }

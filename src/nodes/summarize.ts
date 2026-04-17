@@ -1,7 +1,7 @@
-import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { FilesystemAdapter } from "../adapters/filesystem.ts";
-import { SceneSummarySchema, type SceneSummary } from "../schemas/summary.ts";
+import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { CaptureResult } from "../schemas/capture.ts";
+import { type SceneSummary, SceneSummarySchema } from "../schemas/summary.ts";
 
 interface SummarizeNodeDeps {
   ollama: OllamaAdapter;
@@ -65,7 +65,9 @@ function buildPrompt(prev: PreviousContext): string {
   }
 
   const fields = hasAnyPrev ? JSON_FIELDS_WITH_TRANSITION : JSON_FIELDS;
-  parts.push(`\nReturn a JSON object with exactly these fields:\n${fields}\n\nReturn ONLY the JSON object, no other text.`);
+  parts.push(
+    `\nReturn a JSON object with exactly these fields:\n${fields}\n\nReturn ONLY the JSON object, no other text.`,
+  );
 
   return parts.join("\n");
 }
@@ -78,9 +80,7 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-async function loadPreviousContext(
-  deps: SummarizeNodeDeps,
-): Promise<PreviousContext> {
+async function loadPreviousContext(deps: SummarizeNodeDeps): Promise<PreviousContext> {
   const now = deps.now ?? (() => new Date());
   const fileExists = deps.fileExists ?? ((p: string) => Bun.file(p).exists());
   try {
@@ -96,7 +96,9 @@ async function loadPreviousContext(
     const prevPath = typeof capture?.imagePath === "string" ? capture.imagePath : undefined;
     if (!prevPath) return { summary: prevSummary };
     if (!(await fileExists(prevPath))) {
-      console.warn(`summarize: previous capture file missing, falling back to single image: ${prevPath}`);
+      console.warn(
+        `summarize: previous capture file missing, falling back to single image: ${prevPath}`,
+      );
       return { summary: prevSummary };
     }
     const imageBase64 = await deps.readFileBase64(prevPath);
@@ -119,9 +121,7 @@ export function createSummarizeNode(deps: SummarizeNodeDeps) {
     try {
       const currentBase64 = await deps.readFileBase64(state.capture.imagePath);
       const prev = await loadPreviousContext(deps);
-      const images = prev.imageBase64
-        ? [prev.imageBase64, currentBase64]
-        : [currentBase64];
+      const images = prev.imageBase64 ? [prev.imageBase64, currentBase64] : [currentBase64];
       const prompt = buildPrompt(prev);
       rawResponse = await deps.ollama.generateWithImage(prompt, images);
     } catch (err) {

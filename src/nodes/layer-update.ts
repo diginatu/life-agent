@@ -1,15 +1,15 @@
-import type { OllamaAdapter } from "../adapters/ollama.ts";
-import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { BaseStore } from "@langchain/langgraph";
-import type { LogEntry } from "./history-format.ts";
-import { summarizeLayer, summarizeL3 } from "../memory/summarize-layer.ts";
-import { updateL4, type EvictedL3Entry } from "../memory/update-l4.ts";
+import type { FilesystemAdapter } from "../adapters/filesystem.ts";
+import type { OllamaAdapter } from "../adapters/ollama.ts";
 import {
   DEFAULT_L4_MAX_CHARS,
   DEFAULT_L4_PROMPT,
   L4_KEY,
   L4_NAMESPACE,
 } from "../memory/constants.ts";
+import { summarizeL3, summarizeLayer } from "../memory/summarize-layer.ts";
+import { type EvictedL3Entry, updateL4 } from "../memory/update-l4.ts";
+import type { LogEntry } from "./history-format.ts";
 
 export interface LayerUpdateNodeDeps {
   ollama: OllamaAdapter;
@@ -28,9 +28,9 @@ export interface LayerUpdateNodeDeps {
 
 function toLocalHourKey(date: Date): string {
   const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
   return `${y}-${m}-${d}T${h}`;
 }
 
@@ -38,15 +38,17 @@ function toLocalHourKey(date: Date): string {
 function toL3BucketStart(date: Date): Date {
   const h = date.getUTCHours();
   const bucketHour = L3_BUCKET_HOURS.filter((bh) => bh <= h).at(-1) ?? 0;
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), bucketHour));
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), bucketHour),
+  );
 }
 
 /** Key for an L3 bucket: YYYY-MM-DDTHH using the bucket's UTC start. */
 function toL3BucketKey(bucketStart: Date): string {
   const y = bucketStart.getUTCFullYear();
-  const m = String(bucketStart.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(bucketStart.getUTCDate()).padStart(2, '0');
-  const h = String(bucketStart.getUTCHours()).padStart(2, '0');
+  const m = String(bucketStart.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(bucketStart.getUTCDate()).padStart(2, "0");
+  const h = String(bucketStart.getUTCHours()).padStart(2, "0");
   return `${y}-${m}-${d}T${h}`;
 }
 
@@ -62,7 +64,9 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
     const maxScanDays = deps.maxScanDays ?? DEFAULT_MAX_SCAN_DAYS;
 
     // Fetch existing L2 keys to skip
-    const existingL2 = await deps.store.search(L2_NAMESPACE as unknown as string[], { limit: 10000 });
+    const existingL2 = await deps.store.search(L2_NAMESPACE as unknown as string[], {
+      limit: 10000,
+    });
     const existingKeys = new Set(existingL2.map((item: { key: string }) => item.key));
 
     // Cutoff: latest UTC hour H such that H + 1h + l2DelayHours*h <= now
@@ -119,7 +123,9 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
     }
 
     // --- Phase 2: L3 6-hour bucket rollup (consumes L2 before eviction) ---
-    const existingL3 = await deps.store.search(L3_NAMESPACE as unknown as string[], { limit: 10000 });
+    const existingL3 = await deps.store.search(L3_NAMESPACE as unknown as string[], {
+      limit: 10000,
+    });
     const existingL3Keys = new Set(existingL3.map((item: { key: string }) => item.key));
 
     // L3 cutoff: latest bucket B such that B + 6h + l3DelayHours*h <= now
@@ -147,7 +153,15 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
           if (!ws) return false;
           return ws >= bStart && ws < bEnd;
         })
-        .map((item: { value: unknown }) => item.value as { content: string; windowStart: string; windowEnd: string; sourceCount: number });
+        .map(
+          (item: { value: unknown }) =>
+            item.value as {
+              content: string;
+              windowStart: string;
+              windowEnd: string;
+              sourceCount: number;
+            },
+        );
 
       if (l2Items.length === 0) {
         continue;
@@ -162,7 +176,9 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         sourceCount: l2Items.length,
       });
 
-      const allL3AfterWrite = await deps.store.search(L3_NAMESPACE as unknown as string[], { limit: 10000 });
+      const allL3AfterWrite = await deps.store.search(L3_NAMESPACE as unknown as string[], {
+        limit: 10000,
+      });
       if (allL3AfterWrite.length > deps.l3MaxRetention) {
         const sorted = [...allL3AfterWrite].sort((a, b) => {
           const aWs = (a.value as { windowStart?: string }).windowStart ?? "";
@@ -173,7 +189,8 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
 
         const existingL4 = await deps.store.get(L4_NAMESPACE as unknown as string[], L4_KEY);
         let l4Content = (existingL4?.value as { content?: string } | null)?.content ?? "";
-        let l4SourceCount = (existingL4?.value as { sourceCount?: number } | null)?.sourceCount ?? 0;
+        let l4SourceCount =
+          (existingL4?.value as { sourceCount?: number } | null)?.sourceCount ?? 0;
 
         for (const item of toEvict) {
           const evicted = item.value as EvictedL3Entry;
@@ -201,7 +218,9 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
     }
 
     // --- Phase 3: L2 eviction (safe — L3 has already consumed what it needs) ---
-    const allL2Final = await deps.store.search(L2_NAMESPACE as unknown as string[], { limit: 10000 });
+    const allL2Final = await deps.store.search(L2_NAMESPACE as unknown as string[], {
+      limit: 10000,
+    });
     if (allL2Final.length > deps.l2MaxRetention) {
       const sorted = [...allL2Final].sort((a, b) => {
         const aWs = (a.value as { windowStart?: string }).windowStart ?? "";

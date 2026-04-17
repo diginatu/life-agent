@@ -5,8 +5,8 @@ export type UserFeedbackEntry = z.infer<typeof UserFeedbackSchema>[number];
 
 export interface LogEntry {
   timestamp?: string;
-  summary?: { activityGuess?: string | null; posture?: string;[key: string]: unknown };
-  decision?: { action?: string; reason?: string;[key: string]: unknown };
+  summary?: { activityGuess?: string | null; posture?: string; [key: string]: unknown };
+  decision?: { action?: string; reason?: string; [key: string]: unknown };
   message?: { body?: string } | null;
   feedbackFromPrevious?: { text: string; userId: string; timestamp: string }[];
   tags?: string[];
@@ -18,7 +18,13 @@ export function formatHistory(entries: LogEntry[]): { history: string } {
   const regularEntries = entries.filter((e) => !e.tags?.includes("digest"));
 
   const historyLines = regularEntries.map((e) => {
-    const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "??:??";
+    const time = e.timestamp
+      ? new Date(e.timestamp).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
+      : "??:??";
     const activity = e.summary?.activityGuess ?? "unknown";
     const posture = e.summary?.posture ?? "unknown";
     const action = e.decision?.action ?? "unknown";
@@ -43,7 +49,11 @@ export function formatUserFeedback(feedback: UserFeedbackEntry[] | undefined): s
   if (!feedback || feedback.length === 0) return "";
   const lines = feedback.map((f) => {
     const time = f.timestamp
-      ? new Date(f.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+      ? new Date(f.timestamp).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
       : "??:??";
     return `  - [${time}] ${f.text}`;
   });

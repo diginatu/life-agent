@@ -1,14 +1,14 @@
-import { BaseStore } from "@langchain/langgraph-checkpoint";
 import type {
-  Operation,
-  OperationResults,
   Item,
-  SearchItem,
-  PutOperation,
-  SearchOperation,
   ListNamespacesOperation,
   MatchCondition,
+  Operation,
+  OperationResults,
+  PutOperation,
+  SearchItem,
+  SearchOperation,
 } from "@langchain/langgraph-checkpoint";
+import { BaseStore } from "@langchain/langgraph-checkpoint";
 
 interface SerializedItem {
   namespace: string[];
@@ -87,9 +87,7 @@ export class FileStore extends BaseStore {
     await Bun.write(`${this.dir}/store.json`, JSON.stringify(items, null, 2));
   }
 
-  async batch<Op extends readonly Operation[]>(
-    operations: Op
-  ): Promise<OperationResults<Op>> {
+  async batch<Op extends readonly Operation[]>(operations: Op): Promise<OperationResults<Op>> {
     const results: unknown[] = [];
     let needsPersist = false;
 
@@ -127,9 +125,7 @@ export class FileStore extends BaseStore {
     for (const [nsKey, nsMap] of this.data) {
       // Empty prefix matches all, otherwise nsKey must start with prefix
       const prefixMatches =
-        prefixKey === "" ||
-        nsKey === prefixKey ||
-        nsKey.startsWith(`${prefixKey}:`);
+        prefixKey === "" || nsKey === prefixKey || nsKey.startsWith(`${prefixKey}:`);
 
       if (!prefixMatches) continue;
 
@@ -208,7 +204,7 @@ export class FileStore extends BaseStore {
 
     if (op.matchConditions && op.matchConditions.length > 0) {
       filtered = allNamespaces.filter((ns) =>
-        op.matchConditions!.every((cond) => matchesCondition(ns, cond))
+        op.matchConditions!.every((cond) => matchesCondition(ns, cond)),
       );
     }
 

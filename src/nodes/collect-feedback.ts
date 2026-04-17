@@ -1,5 +1,5 @@
-import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { DiscordAdapter } from "../adapters/discord.ts";
+import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { Config } from "../config.ts";
 
 interface CollectFeedbackDeps {
@@ -42,9 +42,7 @@ export function createCollectFeedbackNode(deps: CollectFeedbackDeps) {
       console.log(`[User Feedback]\n${replies.length} replies collected`);
       return { userFeedback: replies };
     } catch (err) {
-      console.error(
-        `collect-feedback: error: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      console.error(`collect-feedback: error: ${err instanceof Error ? err.message : String(err)}`);
       return {};
     }
   };

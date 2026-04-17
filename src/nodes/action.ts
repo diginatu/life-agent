@@ -1,9 +1,10 @@
-import type { OllamaAdapter } from "../adapters/ollama.ts";
-import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { BaseStore } from "@langchain/langgraph";
-import { ActionSelectionSchema, type ActionSelection } from "../schemas/action.ts";
-import type { SceneSummary } from "../schemas/summary.ts";
+import type { FilesystemAdapter } from "../adapters/filesystem.ts";
+import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { Config } from "../config.ts";
+import { L4_KEY, L4_NAMESPACE } from "../memory/constants.ts";
+import { type ActionSelection, ActionSelectionSchema } from "../schemas/action.ts";
+import type { SceneSummary } from "../schemas/summary.ts";
 import { formatTime } from "./format-time.ts";
 import {
   formatHistory,
@@ -11,7 +12,6 @@ import {
   type LogEntry,
   type UserFeedbackEntry,
 } from "./history-format.ts";
-import { L4_KEY, L4_NAMESPACE } from "../memory/constants.ts";
 
 interface ActionNodeDeps {
   ollama: OllamaAdapter;
@@ -81,7 +81,9 @@ function buildPrompt(
 
   if (l3Entries.length > 0) {
     historySections += "\n6-hour overview:\n";
-    historySections += l3Entries.map((e) => `[${e.windowStart}..${e.windowEnd}] ${e.content}`).join("\n");
+    historySections += l3Entries
+      .map((e) => `[${e.windowStart}..${e.windowEnd}] ${e.content}`)
+      .join("\n");
     historySections += "\n";
   }
 
@@ -112,7 +114,7 @@ Current time:
 ${historySections}
 Available actions:
 ${actionDescriptions}
-${!userFeedback || userFeedback.length === 0 ? "\nIMPORTANT: There are no new user messages in this cycle. Do NOT just \"reply\"" : "\nIMPORTANT: The user has sent a new message this cycle. You MUST choose an action that acknowledges their message. Do NOT choose \"none\" when the user is actively communicating with you."}
+${!userFeedback || userFeedback.length === 0 ? '\nIMPORTANT: There are no new user messages in this cycle. Do NOT just "reply"' : '\nIMPORTANT: The user has sent a new message this cycle. You MUST choose an action that acknowledges their message. Do NOT choose "none" when the user is actively communicating with you.'}
 You MUST choose an action from the available actions list above. Return a JSON object with exactly these fields:
 {
   "reason": string explaining your choice
@@ -179,7 +181,7 @@ export function createActionNode(deps: ActionNodeDeps) {
         cutoff = new Date(currentTime.getTime() - (1 + l2DelayHours) * 3600000).toISOString();
       }
       try {
-        logEntries = await deps.fs.readEntriesSince(deps.logDir, cutoff) as LogEntry[];
+        logEntries = (await deps.fs.readEntriesSince(deps.logDir, cutoff)) as LogEntry[];
       } catch {
         // History is best-effort; continue without it
       }

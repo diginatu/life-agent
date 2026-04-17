@@ -1,23 +1,23 @@
-import { StateGraph, START, END } from "@langchain/langgraph";
 import type { BaseStore } from "@langchain/langgraph";
-import { GraphState } from "./state.ts";
+import { END, START, StateGraph } from "@langchain/langgraph";
+import type { DiscordAdapter } from "./adapters/discord.ts";
+import { createDiscordAdapter } from "./adapters/discord.ts";
+import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
+import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
+import type { FilesystemAdapter } from "./adapters/filesystem.ts";
+import { createFilesystemAdapter } from "./adapters/filesystem.ts";
+import type { OllamaAdapter } from "./adapters/ollama.ts";
+import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
+import type { Config } from "./config.ts";
+import { createActionNode } from "./nodes/action.ts";
 import { createCaptureNode } from "./nodes/capture.ts";
 import { createCollectFeedbackNode } from "./nodes/collect-feedback.ts";
-import { createSummarizeNode } from "./nodes/summarize.ts";
-import { createActionNode } from "./nodes/action.ts";
+import { createLayerUpdateNode } from "./nodes/layer-update.ts";
 import { createMessageNode } from "./nodes/message.ts";
 import { createPersistNode } from "./nodes/persist.ts";
-import { createLayerUpdateNode } from "./nodes/layer-update.ts";
-import { createFfmpegAdapter } from "./adapters/ffmpeg.ts";
-import { createOllamaAdapterFromConfig } from "./adapters/ollama.ts";
-import { createFilesystemAdapter } from "./adapters/filesystem.ts";
-import { createDiscordAdapter } from "./adapters/discord.ts";
+import { createSummarizeNode } from "./nodes/summarize.ts";
+import { GraphState } from "./state.ts";
 import { FileStore } from "./store/file-store.ts";
-import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
-import type { OllamaAdapter } from "./adapters/ollama.ts";
-import type { FilesystemAdapter } from "./adapters/filesystem.ts";
-import type { DiscordAdapter } from "./adapters/discord.ts";
-import type { Config } from "./config.ts";
 
 interface GraphDeps {
   ffmpeg?: FfmpegAdapter;
@@ -89,9 +89,17 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     discord,
   });
 
-  const store = deps.store ?? await FileStore.create({ dir: s.memoryDir });
+  const store = deps.store ?? (await FileStore.create({ dir: s.memoryDir }));
 
-  const actionNode = createActionNode({ ollama, actionsConfig: config, fs, logDir: s.logDir, store, l2DelayHours: s.l2DelayHours, now: deps.now });
+  const actionNode = createActionNode({
+    ollama,
+    actionsConfig: config,
+    fs,
+    logDir: s.logDir,
+    store,
+    l2DelayHours: s.l2DelayHours,
+    now: deps.now,
+  });
 
   const layerUpdateNode = createLayerUpdateNode({
     ollama,

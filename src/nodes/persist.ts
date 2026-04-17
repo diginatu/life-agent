@@ -1,10 +1,10 @@
-import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { DiscordAdapter } from "../adapters/discord.ts";
-import type { CaptureResult } from "../schemas/capture.ts";
-import type { SceneSummary } from "../schemas/summary.ts";
-import type { ActionSelection } from "../schemas/action.ts";
-import type { DraftMessage } from "../schemas/message.ts";
+import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { Config } from "../config.ts";
+import type { ActionSelection } from "../schemas/action.ts";
+import type { CaptureResult } from "../schemas/capture.ts";
+import type { DraftMessage } from "../schemas/message.ts";
+import type { SceneSummary } from "../schemas/summary.ts";
 
 interface PersistNodeDeps {
   fs: FilesystemAdapter;
@@ -35,14 +35,21 @@ export function createPersistNode(deps: PersistNodeDeps) {
 
     // Send Discord message for active actions
     let discordMessageId: string | null = null;
-    if (discord && state.decision && actionsConfig.isActiveAction(state.decision.action) && state.message) {
+    if (
+      discord &&
+      state.decision &&
+      actionsConfig.isActiveAction(state.decision.action) &&
+      state.message
+    ) {
       try {
         discordMessageId = await discord.sendMessage(
           state.message.body,
           actionsConfig.settings.discordMentionUserId || undefined,
         );
       } catch (err) {
-        console.error(`persist: discord send error: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(
+          `persist: discord send error: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
@@ -52,7 +59,9 @@ export function createPersistNode(deps: PersistNodeDeps) {
       try {
         discordLastSeenMessageId = await discord.getLatestMessageId();
       } catch (err) {
-        console.error(`persist: discord getLatestMessageId error: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(
+          `persist: discord getLatestMessageId error: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 

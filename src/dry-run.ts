@@ -1,8 +1,8 @@
 import { InMemoryStore } from "@langchain/langgraph";
-import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
-import type { OllamaAdapter } from "./adapters/ollama.ts";
-import type { FilesystemAdapter } from "./adapters/filesystem.ts";
 import type { DiscordAdapter } from "./adapters/discord.ts";
+import type { FfmpegAdapter } from "./adapters/ffmpeg.ts";
+import type { FilesystemAdapter } from "./adapters/filesystem.ts";
+import type { OllamaAdapter } from "./adapters/ollama.ts";
 
 const summaryJson = JSON.stringify({
   personPresent: true,
