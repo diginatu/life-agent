@@ -84,7 +84,6 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
     for (let h = new Date(scanStart); h <= cutoff; h = new Date(h.getTime() + 3600000)) {
       const key = toLocalHourKey(h);
       if (existingKeys.has(key)) {
-        console.log(`[layer-update] L2 skip "${key}" (already exists)`);
         continue;
       }
 
@@ -138,7 +137,6 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
     for (let b = new Date(l3ScanStart); b <= l3Cutoff; b = new Date(b.getTime() + L3_BUCKET_MS)) {
       const bucketKey = toL3BucketKey(b);
       if (existingL3Keys.has(bucketKey)) {
-        console.log(`[layer-update] L3 skip "${bucketKey}" (already exists)`);
         continue;
       }
 
