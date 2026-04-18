@@ -2,16 +2,11 @@ import type { BaseStore } from "@langchain/langgraph";
 import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { Config } from "../config.ts";
-import { L4_KEY, L4_NAMESPACE } from "../memory/constants.ts";
 import { type ActionSelection, ActionSelectionSchema } from "../schemas/action.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import { formatTime } from "./format-time.ts";
-import {
-  formatHistory,
-  formatUserFeedback,
-  type LogEntry,
-  type UserFeedbackEntry,
-} from "./history-format.ts";
+import { formatUserFeedback, type UserFeedbackEntry } from "./history-format.ts";
+import { formatMemoryContext, loadMemoryContext } from "./memory-context.ts";
 
 interface ActionNodeDeps {
   ollama: OllamaAdapter;
@@ -33,12 +28,6 @@ interface ActionNodeResult {
   errors?: string[];
 }
 
-interface LayerEntry {
-  content: string;
-  windowStart: string;
-  windowEnd: string;
-}
-
 const FALLBACK_DECISION: ActionSelection = {
   action: "none",
   priority: "low",
@@ -57,10 +46,7 @@ function buildPrompt(
   summary: SceneSummary,
   actionsConfig: Config,
   currentTime: Date,
-  l4Content: string | null,
-  l3Entries: LayerEntry[],
-  l2Entries: LayerEntry[],
-  logEntries?: LogEntry[],
+  memorySection: string,
   userFeedback?: UserFeedbackEntry[],
 ): string {
   const allActions = actionsConfig.getActionNames();
@@ -71,34 +57,7 @@ function buildPrompt(
     })
     .join("\n");
 
-  let historySections = "";
-  historySections += formatUserFeedback(userFeedback);
-
-  const trimmedL4 = l4Content?.trim() ?? "";
-  if (trimmedL4.length > 0) {
-    historySections += `\nPersistent memory:\n${trimmedL4}\n`;
-  }
-
-  if (l3Entries.length > 0) {
-    historySections += "\n6-hour overview:\n";
-    historySections += l3Entries
-      .map((e) => `[${e.windowStart}..${e.windowEnd}] ${e.content}`)
-      .join("\n");
-    historySections += "\n";
-  }
-
-  if (l2Entries.length > 0) {
-    historySections += "\nHourly overview:\n";
-    historySections += l2Entries.map((e) => `[${e.windowStart}] ${e.content}`).join("\n");
-    historySections += "\n";
-  }
-
-  if (logEntries && logEntries.length > 0) {
-    const { history } = formatHistory(logEntries);
-    if (history) {
-      historySections += `\nRecent history:\n${history}\n`;
-    }
-  }
+  const historySections = formatUserFeedback(userFeedback) + memorySection;
 
   return `You are a personal assistant. Based on the scene analysis and history, select the most appropriate action.
 
@@ -136,65 +95,20 @@ export function createActionNode(deps: ActionNodeDeps) {
 
     const now = deps.now ?? (() => new Date());
     const currentTime = now();
-    const l2DelayHours = deps.l2DelayHours ?? 1;
 
-    const l4Item = deps.store
-      ? await deps.store.get(L4_NAMESPACE as unknown as string[], L4_KEY)
-      : null;
-    const l4Content = (l4Item?.value as { content?: string } | null)?.content ?? null;
-
-    // Read L3 entries
-    const allL3Items = deps.store
-      ? await deps.store.search(["memory", "L3"], { limit: 10000 })
-      : [];
-    const allL3 = allL3Items
-      .map((item) => item.value as LayerEntry)
-      .sort((a, b) => a.windowStart.localeCompare(b.windowStart));
-
-    const latestL3WindowEnd = allL3.reduce<string | null>((max, e) => {
-      if (max === null) return e.windowEnd;
-      return e.windowEnd > max ? e.windowEnd : max;
-    }, null);
-
-    // Read L2 entries, filtering by >= latestL3WindowEnd
-    const allL2Items = deps.store
-      ? await deps.store.search(["memory", "L2"], { limit: 10000 })
-      : [];
-    const filteredL2 = allL2Items
-      .map((item) => item.value as LayerEntry)
-      .filter((e) => latestL3WindowEnd === null || e.windowStart >= latestL3WindowEnd)
-      .sort((a, b) => a.windowStart.localeCompare(b.windowStart));
-
-    const latestL2WindowEnd = filteredL2.reduce<string | null>((max, e) => {
-      if (max === null) return e.windowEnd;
-      return e.windowEnd > max ? e.windowEnd : max;
-    }, null);
-
-    // Read L1 entries via readEntriesSince
-    let logEntries: LogEntry[] | undefined;
-    if (deps.fs && deps.logDir) {
-      let cutoff: string;
-      if (latestL2WindowEnd !== null) {
-        cutoff = latestL2WindowEnd;
-      } else {
-        // No L2: use now - (1 + l2DelayHours) hours
-        cutoff = new Date(currentTime.getTime() - (1 + l2DelayHours) * 3600000).toISOString();
-      }
-      try {
-        logEntries = (await deps.fs.readEntriesSince(deps.logDir, cutoff)) as LogEntry[];
-      } catch {
-        // History is best-effort; continue without it
-      }
-    }
+    const memory = await loadMemoryContext({
+      store: deps.store,
+      fs: deps.fs,
+      logDir: deps.logDir,
+      l2DelayHours: deps.l2DelayHours,
+      now,
+    });
 
     const prompt = buildPrompt(
       state.summary,
       deps.actionsConfig,
       currentTime,
-      l4Content,
-      allL3,
-      filteredL2,
-      logEntries,
+      formatMemoryContext(memory),
       state.userFeedback,
     );
 

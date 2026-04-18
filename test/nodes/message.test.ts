@@ -1,8 +1,20 @@
 import { test, expect, describe } from "bun:test";
+import { InMemoryStore } from "@langchain/langgraph";
 import { createMessageNode } from "../../src/nodes/message.ts";
 import { DraftMessageSchema } from "../../src/schemas/message.ts";
 import type { OllamaAdapter } from "../../src/adapters/ollama.ts";
+import type { FilesystemAdapter } from "../../src/adapters/filesystem.ts";
 import { mockActionsConfig } from "../helpers/mock-config.ts";
+
+function mockFsSince(entries: unknown[]): FilesystemAdapter {
+  return {
+    appendJsonLine: async () => {},
+    readLastNLines: async () => [],
+    readLastNLinesAcrossDays: async () => [],
+    readAllLinesForDay: async () => [],
+    readEntriesSince: async () => entries,
+  };
+}
 
 const actionsConfig = mockActionsConfig();
 
@@ -158,6 +170,132 @@ describe("message node", () => {
     await node(makeState("nudge_break"));
 
     expect(capturedPrompt).toContain("Suggest the user take a short break");
+  });
+});
+
+describe("message node with memory layers", () => {
+  test("L4 + L3 + L2 + L1 all appear in prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validMessageJson;
+      },
+      generateWithImage: async () => validMessageJson,
+    };
+
+    const store = new InMemoryStore();
+    await store.put(["memory", "L4"], "current", {
+      content: "user prefers short nudges",
+      updatedAt: "2026-04-14T06:00:00.000Z",
+      sourceCount: 3,
+    });
+    await store.put(["memory", "L3"], "2026-04-14T00", {
+      content: "L3 overview msg",
+      windowStart: "2026-04-14T00:00:00.000Z",
+      windowEnd: "2026-04-14T06:00:00.000Z",
+      sourceCount: 5,
+    });
+    await store.put(["memory", "L2"], "2026-04-14T06", {
+      content: "L2 msg hour 6",
+      windowStart: "2026-04-14T06:00:00.000Z",
+      windowEnd: "2026-04-14T07:00:00.000Z",
+      sourceCount: 2,
+    });
+
+    const l1 = [
+      {
+        timestamp: "2026-04-14T08:05:00.000Z",
+        summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
+        decision: { action: "none", priority: "low", reason: "l1 msg entry" },
+      },
+    ];
+
+    const node = createMessageNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFsSince(l1),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      now: () => new Date("2026-04-14T09:00:00.000Z"),
+    });
+    await node(makeState("nudge_break"));
+
+    expect(capturedPrompt).toContain("Persistent memory");
+    expect(capturedPrompt).toContain("user prefers short nudges");
+    expect(capturedPrompt).toContain("6-hour overview");
+    expect(capturedPrompt).toContain("L3 overview msg");
+    expect(capturedPrompt).toContain("Hourly overview");
+    expect(capturedPrompt).toContain("L2 msg hour 6");
+    expect(capturedPrompt).toContain("Recent history");
+    expect(capturedPrompt).toContain("l1 msg entry");
+  });
+
+  test("No memory deps: no memory sections in prompt", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validMessageJson;
+      },
+      generateWithImage: async () => validMessageJson,
+    };
+
+    const node = createMessageNode({ ollama: capturingOllama, actionsConfig });
+    await node(makeState("nudge_break"));
+
+    expect(capturedPrompt).not.toContain("Persistent memory");
+    expect(capturedPrompt).not.toContain("6-hour overview");
+    expect(capturedPrompt).not.toContain("Hourly overview");
+    expect(capturedPrompt).not.toContain("Recent history");
+  });
+
+  test("L2 filtered by latestL3.windowEnd (matches action node behavior)", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validMessageJson;
+      },
+      generateWithImage: async () => validMessageJson,
+    };
+
+    const store = new InMemoryStore();
+    await store.put(["memory", "L3"], "2026-04-14T00", {
+      content: "L3 content",
+      windowStart: "2026-04-14T00:00:00.000Z",
+      windowEnd: "2026-04-14T06:00:00.000Z",
+      sourceCount: 5,
+    });
+    // Before L3.windowEnd — excluded
+    await store.put(["memory", "L2"], "2026-04-14T04", {
+      content: "L2 stale hour 4",
+      windowStart: "2026-04-14T04:00:00.000Z",
+      windowEnd: "2026-04-14T05:00:00.000Z",
+      sourceCount: 1,
+    });
+    // At L3.windowEnd boundary — included
+    await store.put(["memory", "L2"], "2026-04-14T06", {
+      content: "L2 fresh hour 6",
+      windowStart: "2026-04-14T06:00:00.000Z",
+      windowEnd: "2026-04-14T07:00:00.000Z",
+      sourceCount: 2,
+    });
+
+    const node = createMessageNode({
+      ollama: capturingOllama,
+      actionsConfig,
+      fs: mockFsSince([]),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      now: () => new Date("2026-04-14T09:00:00.000Z"),
+    });
+    await node(makeState("nudge_break"));
+
+    expect(capturedPrompt).toContain("L2 fresh hour 6");
+    expect(capturedPrompt).not.toContain("L2 stale hour 4");
   });
 });
 

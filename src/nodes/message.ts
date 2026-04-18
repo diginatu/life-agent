@@ -1,13 +1,21 @@
+import type { BaseStore } from "@langchain/langgraph";
+import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { Config } from "../config.ts";
 import type { ActionSelection } from "../schemas/action.ts";
 import { type DraftMessage, DraftMessageSchema } from "../schemas/message.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import { formatUserFeedback, type UserFeedbackEntry } from "./history-format.ts";
+import { formatMemoryContext, loadMemoryContext } from "./memory-context.ts";
 
 interface MessageNodeDeps {
   ollama: OllamaAdapter;
   actionsConfig: Config;
+  fs?: FilesystemAdapter;
+  logDir?: string;
+  store?: BaseStore;
+  l2DelayHours?: number;
+  now?: () => Date;
 }
 
 interface MessageNodeState {
@@ -33,6 +41,7 @@ function buildPrompt(
   summary: SceneSummary,
   decision: ActionSelection,
   responseStyle: string,
+  memorySection: string,
   actionDescription?: string,
   userFeedback?: UserFeedbackEntry[],
 ): string {
@@ -48,7 +57,7 @@ Context:
 - Scene: ${summary.scene}
 - Activity: ${summary.activityGuess ?? "unknown"}
 - Posture: ${summary.posture}
-${feedbackSection}
+${feedbackSection}${memorySection}
 Return a JSON object with exactly this field:
 {
   "body": string (the message content; may be multiple sentences)
@@ -84,10 +93,19 @@ export function createMessageNode(deps: MessageNodeDeps) {
 
     const actionDescription = actionsConfig.getDescription(state.decision.action);
 
+    const memory = await loadMemoryContext({
+      store: deps.store,
+      fs: deps.fs,
+      logDir: deps.logDir,
+      l2DelayHours: deps.l2DelayHours,
+      now: deps.now,
+    });
+
     const prompt = buildPrompt(
       state.summary,
       state.decision,
       actionsConfig.settings.responseStyle,
+      formatMemoryContext(memory),
       actionDescription,
       state.userFeedback,
     );
