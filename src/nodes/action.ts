@@ -57,7 +57,7 @@ function buildPrompt(
     })
     .join("\n");
 
-  const historySections = formatUserFeedback(userFeedback) + memorySection;
+  const historySections = formatUserFeedback(userFeedback, currentTime) + memorySection;
 
   return `You are a personal assistant. Based on the scene analysis and history, select the most appropriate action.
 
@@ -108,7 +108,7 @@ export function createActionNode(deps: ActionNodeDeps) {
       state.summary,
       deps.actionsConfig,
       currentTime,
-      formatMemoryContext(memory),
+      formatMemoryContext(memory, currentTime),
       state.userFeedback,
     );
 

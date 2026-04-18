@@ -42,11 +42,12 @@ function buildPrompt(
   decision: ActionSelection,
   responseStyle: string,
   memorySection: string,
+  currentTime: Date,
   actionDescription?: string,
   userFeedback?: UserFeedbackEntry[],
 ): string {
   const descLine = actionDescription ? `\n- Action description: ${actionDescription}` : "";
-  const feedbackSection = formatUserFeedback(userFeedback);
+  const feedbackSection = formatUserFeedback(userFeedback, currentTime);
   return `You are a personal assistant. Draft a mention post for the user according to the context.
 This message will be posted in a Discord channel and will mention the user. Do no include the mention in the body.
 Follow this response style: ${responseStyle}.
@@ -93,19 +94,23 @@ export function createMessageNode(deps: MessageNodeDeps) {
 
     const actionDescription = actionsConfig.getDescription(state.decision.action);
 
+    const now = deps.now ?? (() => new Date());
+    const currentTime = now();
+
     const memory = await loadMemoryContext({
       store: deps.store,
       fs: deps.fs,
       logDir: deps.logDir,
       l2DelayHours: deps.l2DelayHours,
-      now: deps.now,
+      now,
     });
 
     const prompt = buildPrompt(
       state.summary,
       state.decision,
       actionsConfig.settings.responseStyle,
-      formatMemoryContext(memory),
+      formatMemoryContext(memory, currentTime),
+      currentTime,
       actionDescription,
       state.userFeedback,
     );

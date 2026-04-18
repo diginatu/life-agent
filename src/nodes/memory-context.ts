@@ -71,7 +71,7 @@ export async function loadMemoryContext(deps: MemoryContextDeps): Promise<Memory
   return { l4Content, l3Entries, l2Entries, l1Entries };
 }
 
-export function formatMemoryContext(ctx: MemoryContext): string {
+export function formatMemoryContext(ctx: MemoryContext, now?: Date): string {
   let out = "";
 
   const trimmedL4 = ctx.l4Content?.trim() ?? "";
@@ -92,7 +92,7 @@ export function formatMemoryContext(ctx: MemoryContext): string {
   }
 
   if (ctx.l1Entries && ctx.l1Entries.length > 0) {
-    const { history } = formatHistory(ctx.l1Entries);
+    const { history } = formatHistory(ctx.l1Entries, now);
     if (history) {
       out += `\nRecent history:\n${history}\n`;
     }
