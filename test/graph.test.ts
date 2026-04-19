@@ -23,7 +23,6 @@ const validSummaryJson = JSON.stringify({
 
 const validActionJson = JSON.stringify({
   action: "nudge_break",
-  priority: "low",
   reason: "user has been sitting for a while",
 });
 
@@ -157,7 +156,6 @@ describe("buildGraph (full pipeline)", () => {
   test("none action: no message drafted, no notification", async () => {
     const noneAction = JSON.stringify({
       action: "none",
-      priority: "low",
       reason: "routine check",
     });
     const graph = await buildGraph(config, allMocks({ ollamaGenerateResponses: [noneAction] }));

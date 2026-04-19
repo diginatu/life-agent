@@ -49,7 +49,6 @@ function makeState(action: string, overrides: Record<string, unknown> = {}) {
     summary: baseSummary,
     decision: {
       action,
-      priority: "low" as const,
       reason: "test reason",
     },
     ...overrides,
@@ -207,7 +206,7 @@ describe("message node with memory layers", () => {
       {
         timestamp: "2026-04-14T08:05:00.000Z",
         summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
-        decision: { action: "none", priority: "low", reason: "l1 msg entry" },
+        decision: { action: "none", reason: "l1 msg entry" },
       },
     ];
 

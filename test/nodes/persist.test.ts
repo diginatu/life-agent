@@ -67,7 +67,6 @@ const baseState = {
   },
   decision: {
     action: "none" as const,
-    priority: "low" as const,
     reason: "routine",
   },
   message: null,
@@ -131,7 +130,7 @@ describe("persist node", () => {
 
     const state = {
       ...baseState,
-      decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
+      decision: { action: "nudge_break" as const, reason: "long session" },
       message: { body: "Stand up and stretch — you've been sitting a while." },
     };
     await node(state);
@@ -159,7 +158,7 @@ describe("persist node", () => {
 
     const state = {
       ...baseState,
-      decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
+      decision: { action: "nudge_break" as const, reason: "long session" },
       message: { body: "Stretch." },
     };
     await node(state);
@@ -228,7 +227,7 @@ describe("persist node", () => {
 
     const state = {
       ...baseState,
-      decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
+      decision: { action: "nudge_break" as const, reason: "long session" },
       message: { body: "Stand up and stretch." },
     };
     await node(state);
@@ -256,7 +255,7 @@ describe("persist node", () => {
 
     const state = {
       ...baseState,
-      decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
+      decision: { action: "nudge_break" as const, reason: "long session" },
       message: { body: "Stand up and take a walk." },
     };
 

@@ -40,7 +40,6 @@ function errorFs(): FilesystemAdapter {
 
 const validActionJson = JSON.stringify({
   action: "nudge_break",
-  priority: "low",
   reason: "user has been sitting for a while",
 });
 
@@ -80,7 +79,6 @@ describe("action node", () => {
 
     expect(result.decision).toBeDefined();
     expect(result.decision!.action).toBe("nudge_break");
-    expect(result.decision!.priority).toBe("low");
     expect(result.decision!.reason).toBe("user has been sitting for a while");
   });
 
@@ -111,7 +109,7 @@ describe("action node", () => {
   test("falls back to none on schema validation failure", async () => {
     const invalidSchema = JSON.stringify({
       action: 123,
-      priority: "invalid_priority",
+      // priority removed from schema
     });
     const node = createActionNode({ ollama: mockOllama(invalidSchema), actionsConfig });
     const result = await node(makeState());
@@ -214,16 +212,16 @@ describe("action node", () => {
   });
 });
 
-const historyEntries = [
+  const historyEntries = [
   {
     timestamp: "2026-03-31T09:00:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
-    decision: { action: "none", priority: "low", reason: "routine" },
+    decision: { action: "none", reason: "routine" },
   },
   {
     timestamp: "2026-03-31T10:00:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.85 },
-    decision: { action: "nudge_break", priority: "medium", reason: "long session" },
+    decision: { action: "nudge_break", reason: "long session" },
   },
 ];
 
@@ -320,7 +318,7 @@ describe("action node with history", () => {
     const entriesWithMessage = [
       {
         ...historyEntries[0],
-        decision: { action: "nudge_break", priority: "medium", reason: "long session" },
+        decision: { action: "nudge_break", reason: "long session" },
         message: { body: "Time for a stretch! You've been coding for a while." },
       },
       historyEntries[1],
@@ -515,12 +513,12 @@ const l1Entries = [
   {
     timestamp: "2026-04-14T08:05:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
-    decision: { action: "none", priority: "low", reason: "l1 entry one" },
+    decision: { action: "none", reason: "l1 entry one" },
   },
   {
     timestamp: "2026-04-14T08:30:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "reading", confidence: 0.8 },
-    decision: { action: "nudge_break", priority: "medium", reason: "l1 entry two" },
+    decision: { action: "nudge_break", reason: "l1 entry two" },
   },
 ];
 
@@ -638,7 +636,7 @@ describe("action node with L2/L3 memory layers", () => {
       readAllLinesForDay: async () => [],
       readEntriesSince: async (_dir, since) => {
         capturedSince = since;
-        return [{ timestamp: "2026-04-14T09:00:00.000Z", summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "l1 no l2", confidence: 0.7 }, decision: { action: "none", priority: "low", reason: "no l2 entry" } }];
+        return [{ timestamp: "2026-04-14T09:00:00.000Z", summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "l1 no l2", confidence: 0.7 }, decision: { action: "none", reason: "no l2 entry" } }];
       },
     };
 

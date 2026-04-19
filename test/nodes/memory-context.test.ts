@@ -58,7 +58,7 @@ describe("loadMemoryContext", () => {
       {
         timestamp: "2026-04-14T08:30:00.000Z",
         summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "reading", confidence: 0.8 },
-        decision: { action: "none", priority: "low", reason: "l1 entry" },
+        decision: { action: "none", reason: "l1 entry" },
       },
     ];
 

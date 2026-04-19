@@ -30,7 +30,6 @@ interface ActionNodeResult {
 
 const FALLBACK_DECISION: ActionSelection = {
   action: "none",
-  priority: "low",
   reason: "fallback: action selection failed",
 };
 
@@ -77,7 +76,6 @@ ${!userFeedback || userFeedback.length === 0 ? '\nIMPORTANT: There are no new us
 You MUST choose an action from the available actions list above. Return a JSON object with exactly these fields:
 {
   "reason": string explaining your choice
-  "priority": "low" | "medium" | "high",
   "action": one of ${JSON.stringify(allActions)},
 }
 

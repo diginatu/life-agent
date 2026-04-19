@@ -100,21 +100,12 @@ describe("ActionSelectionSchema", () => {
   test("accepts valid action selection", () => {
     const result = ActionSelectionSchema.parse({
       action: "nudge_break",
-      priority: "low",
       reason: "user sitting for 2 hours",
     });
     expect(result.action).toBe("nudge_break");
   });
 
-  test("rejects invalid priority", () => {
-    expect(() =>
-      ActionSelectionSchema.parse({
-        action: "nudge_break",
-        priority: "critical",
-        reason: "test",
-      })
-    ).toThrow();
-  });
+  // priority field removed from ActionSelectionSchema
 });
 
 describe("DraftMessageSchema", () => {
@@ -154,7 +145,6 @@ describe("LogEntrySchema", () => {
     policy: null,
     decision: {
       action: "none" as const,
-      priority: "low" as const,
       reason: "routine logging",
     },
     message: null,
@@ -171,7 +161,7 @@ describe("LogEntrySchema", () => {
   test("accepts log entry with message", () => {
     const withMessage = {
       ...validEntry,
-      decision: { action: "nudge_break" as const, priority: "medium" as const, reason: "long session" },
+      decision: { action: "nudge_break" as const, reason: "long session" },
       message: { body: "Take a walk — you've been at it a while" },
     };
     const result = LogEntrySchema.parse(withMessage);
