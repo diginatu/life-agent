@@ -243,9 +243,21 @@ describe("formatMemoryContext", () => {
     expect(out).toContain("Persistent memory");
     expect(out).toContain("persistent facts");
     expect(out).toContain("6-hour overview");
-    expect(out).toContain("[2026-04-14T00:00:00.000Z..2026-04-14T06:00:00.000Z] L3a");
+    // Timestamps are formatted in local time by default
+    function localIso(iso: string) {
+      const d = new Date(iso);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const h = String(d.getHours()).padStart(2, "0");
+      const min = String(d.getMinutes()).padStart(2, "0");
+      const s = String(d.getSeconds()).padStart(2, "0");
+      return `${y}-${m}-${day}T${h}:${min}:${s}`;
+    }
+
+    expect(out).toContain(`[${localIso("2026-04-14T00:00:00.000Z")}..${localIso("2026-04-14T06:00:00.000Z")}] L3a`);
     expect(out).toContain("Hourly overview");
-    expect(out).toContain("[2026-04-14T06:00:00.000Z] L2a");
+    expect(out).toContain(`[${localIso("2026-04-14T06:00:00.000Z")}] L2a`);
     expect(out).toContain("Recent history");
 
     const l4Idx = out.indexOf("Persistent memory");
@@ -285,5 +297,25 @@ describe("formatMemoryContext", () => {
       l1Entries: [],
     });
     expect(out).not.toContain("Recent history");
+  });
+
+  test("localTime=false preserves ISO timestamps", () => {
+    const out = formatMemoryContext(
+      {
+        l4Content: null,
+        l3Entries: [
+          { content: "L3a", windowStart: "2026-04-14T00:00:00.000Z", windowEnd: "2026-04-14T06:00:00.000Z" },
+        ],
+        l2Entries: [
+          { content: "L2a", windowStart: "2026-04-14T06:00:00.000Z", windowEnd: "2026-04-14T07:00:00.000Z" },
+        ],
+        l1Entries: [],
+      },
+      undefined,
+      { localTime: false },
+    );
+
+    expect(out).toContain("[2026-04-14T00:00:00.000Z..2026-04-14T06:00:00.000Z] L3a");
+    expect(out).toContain("[2026-04-14T06:00:00.000Z] L2a");
   });
 });

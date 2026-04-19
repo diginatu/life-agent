@@ -71,8 +71,29 @@ export async function loadMemoryContext(deps: MemoryContextDeps): Promise<Memory
   return { l4Content, l3Entries, l2Entries, l1Entries };
 }
 
-export function formatMemoryContext(ctx: MemoryContext, now?: Date): string {
+// formatMemoryContext: default to local time for prompts. Pass opts.localTime = false
+// to preserve stored ISO/UTC strings when that is desired.
+export function formatMemoryContext(
+  ctx: MemoryContext,
+  now?: Date,
+  opts?: { localTime?: boolean },
+): string {
+  const localTime = opts?.localTime ?? true; // default to local time for prompts
   let out = "";
+
+  function formatLocal(iso: string) {
+    if (!localTime) return iso;
+    const d = new Date(iso);
+    // If the stored timestamp is malformed, fall back to the original string.
+    if (Number.isNaN(d.getTime())) return iso;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const h = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    const s = String(d.getSeconds()).padStart(2, "0");
+    return `${y}-${m}-${day}T${h}:${min}:${s}`;
+  }
 
   const trimmedL4 = ctx.l4Content?.trim() ?? "";
   if (trimmedL4.length > 0) {
@@ -81,13 +102,17 @@ export function formatMemoryContext(ctx: MemoryContext, now?: Date): string {
 
   if (ctx.l3Entries.length > 0) {
     out += "\n6-hour overview:\n";
-    out += ctx.l3Entries.map((e) => `[${e.windowStart}..${e.windowEnd}] ${e.content}`).join("\n");
+    out += ctx.l3Entries
+      .map((e) => `[${formatLocal(e.windowStart)}..${formatLocal(e.windowEnd)}] ${e.content}`)
+      .join("\n");
     out += "\n";
   }
 
   if (ctx.l2Entries.length > 0) {
     out += "\nHourly overview:\n";
-    out += ctx.l2Entries.map((e) => `[${e.windowStart}] ${e.content}`).join("\n");
+    out += ctx.l2Entries
+      .map((e) => `[${formatLocal(e.windowStart)}] ${e.content}`)
+      .join("\n");
     out += "\n";
   }
 

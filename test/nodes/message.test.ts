@@ -126,7 +126,7 @@ describe("message node", () => {
   });
 
   test("passes context in prompt", async () => {
-    let capturedPrompt = "";
+  let capturedPrompt = "";
     const capturingOllama: OllamaAdapter = {
       generate: async (prompt) => {
         capturedPrompt = prompt;
@@ -230,6 +230,63 @@ describe("message node with memory layers", () => {
     expect(capturedPrompt).toContain("L2 msg hour 6");
     expect(capturedPrompt).toContain("Recent history");
     expect(capturedPrompt).toContain("l1 msg entry");
+  });
+
+  test("memory timestamps in prompt are shown in local time", async () => {
+    // This test captures the prompt produced by the message node and verifies
+    // that L3 and L2 window timestamps are formatted in local time inside the
+    // memory section. We compute the expected local-format strings dynamically
+    // so the test is timezone-independent.
+    let capturedPrompt = "";
+
+    const now = () => new Date("2026-04-14T09:00:00.000Z");
+
+    const store = new InMemoryStore();
+    await store.put(["memory", "L3"], "2026-04-14T00", {
+      content: "L3 overview msg",
+      windowStart: "2026-04-14T00:00:00.000Z",
+      windowEnd: "2026-04-14T06:00:00.000Z",
+      sourceCount: 1,
+    });
+    await store.put(["memory", "L2"], "2026-04-14T06", {
+      content: "L2 msg hour 6",
+      windowStart: "2026-04-14T06:00:00.000Z",
+      windowEnd: "2026-04-14T07:00:00.000Z",
+      sourceCount: 1,
+    });
+
+    // Capture the prompt via a fake Ollama adapter
+    let capturedPromptLocal = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        capturedPromptLocal = prompt;
+        return validMessageJson;
+      },
+      generateWithImage: async () => validMessageJson,
+    };
+
+    const node = createMessageNode({ ollama: capturingOllama, actionsConfig, store, fs: mockFsSince([]), logDir: "./logs", l2DelayHours: 1, now });
+    await node(makeState("nudge_break"));
+
+    // Helper to format an ISO UTC timestamp to local YYYY-MM-DDTHH:MM:SS
+    function localIso(iso: string) {
+      const d = new Date(iso);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const h = String(d.getHours()).padStart(2, "0");
+      const min = String(d.getMinutes()).padStart(2, "0");
+      const s = String(d.getSeconds()).padStart(2, "0");
+      return `${y}-${m}-${day}T${h}:${min}:${s}`;
+    }
+
+    // Confirm memory labels present
+    expect(capturedPromptLocal).toContain("6-hour overview");
+    expect(capturedPromptLocal).toContain("Hourly overview");
+
+    // Expect the prompt to contain the local-formatted timestamps
+    expect(capturedPromptLocal).toContain(localIso("2026-04-14T00:00:00.000Z"));
+    expect(capturedPromptLocal).toContain(localIso("2026-04-14T06:00:00.000Z"));
   });
 
   test("No memory deps: no memory sections in prompt", async () => {
