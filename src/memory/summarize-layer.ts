@@ -16,7 +16,7 @@ export async function summarizeLayer(
   windowLabel: string,
 ): Promise<string> {
   const { history } = formatHistory(entries);
-  const prompt = `Summarize the activity log for time window "${windowLabel}". Write 1-3 concise sentences describing what the person was doing, their posture, and any notable events, actions or user information. Keep the detail like time, number, name or action for important information.\n\nActivity log:\n${history}`;
+  const prompt = `Summarize the log for time window "${windowLabel}". Write 1-3 concise sentences including the information for the personal assistant. Because the later assistant will only refer to this, keep the details like user information, set goals, set rules, important conversation, what the person was doing, and any notable events.\n\nActivity log:\n${history}`;
   console.log(`[layer-update] Summarizing window "${windowLabel}" (${entries.length} entries)`);
   return ollama.generate(prompt);
 }
@@ -28,7 +28,7 @@ export async function summarizeL3(
   windowLabel: string,
 ): Promise<string> {
   const lines = l2Entries.map((e) => `[${e.windowStart}] ${e.content}`).join("\n");
-  const prompt = `Summarize the following hourly summaries for time window "${windowLabel}". Write 2-5 concise sentences describing what the person was doing, their posture, and any notable events, actions or user information. Keep the detail like time, number, name or action for important information.\n\nHourly summaries:\n${lines}`;
+  const prompt = `Summarize the following hourly summaries for time window "${windowLabel}". Write 2-5 concise sentences including the information for the personal assistant. Because the later assistant will only refer to this, keep the details like user information, set goals, set rules, important conversation, what the person was doing, and any notable events.\n\nHourly summaries:\n${lines}`;
   console.log(
     `[layer-update] Summarizing L3 window "${windowLabel}" (${l2Entries.length} L2 entries)`,
   );
