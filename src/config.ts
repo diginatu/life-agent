@@ -16,8 +16,9 @@ const SettingsSchema = z.object({
   discordChannelId: z.string().default(""),
   discordMentionUserId: z.string().default(""),
   responseStyle: z.string().default("English, friendly and concise"),
-  l2DelayHours: z.number().int().nonnegative().default(1),
-  l3DelayHours: z.number().int().nonnegative().default(6),
+  // Allow fractional hour delays (e.g. 0.5 = 30 minutes)
+  l2DelayHours: z.number().nonnegative().default(1),
+  l3DelayHours: z.number().nonnegative().default(6),
   l2MaxRetention: z.number().int().positive().default(48),
   l3MaxRetention: z.number().int().positive().default(28),
   l4MaxChars: z.number().int().positive().default(DEFAULT_L4_MAX_CHARS),
