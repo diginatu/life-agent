@@ -69,10 +69,13 @@ Scene analysis:
 
 Current time:
 - ${formatTime(currentTime)}
+
 ${historySections}
+
 Available actions:
 ${actionDescriptions}
-${!userFeedback || userFeedback.length === 0 ? '\nIMPORTANT: There are no new user messages in this cycle. Do NOT just "reply"' : '\nIMPORTANT: The user has sent a new message this cycle. You MUST choose an action that acknowledges their message. Do NOT choose "none" when the user is actively communicating with you.'}
+
+${!userFeedback || userFeedback.length === 0 ? '\nIMPORTANT: There are no new user messages in this cycle. Do NOT just "reply"' : '\nIMPORTANT: The user has sent a new message this cycle.'}
 You MUST choose an action from the available actions list above. Return a JSON object with exactly these fields:
 {
   "reason": string explaining your choice
