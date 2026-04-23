@@ -6,6 +6,7 @@ settings:
   webcamDevice: /dev/video2
   ollamaModel: llama3:8b
   ollamaBaseUrl: http://localhost:11434
+  ollamaThink: true
   logDir: ./my-logs
   captureDir: ./my-captures
   captureWidth: 1280
@@ -54,6 +55,7 @@ describe("loadConfig", () => {
       const config = loadConfig(VALID_YAML);
       expect(config.settings.webcamDevice).toBe("/dev/video2");
       expect(config.settings.ollamaModel).toBe("llama3:8b");
+      expect(config.settings.ollamaThink).toBe(true);
       expect(config.settings.logDir).toBe("./my-logs");
       expect(config.settings.captureWidth).toBe(1280);
     });
@@ -62,6 +64,7 @@ describe("loadConfig", () => {
       const config = loadConfig(MINIMAL_YAML);
       expect(config.settings.webcamDevice).toBe("/dev/video0");
       expect(config.settings.ollamaModel).toBe("gemma3:12b");
+      expect(config.settings.ollamaThink).toBe(false);
       expect(config.settings.logDir).toBe("./logs");
       expect(config.settings.captureDir).toBe("./captures");
       expect(config.settings.captureWidth).toBe(640);

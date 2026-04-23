@@ -29,6 +29,23 @@ test("discordChannelId defaults to empty string", () => {
   expect(config.settings.discordChannelId).toBe("");
 });
 
+test("ollamaThink defaults to false", () => {
+  const config = loadConfig(minimalYaml);
+  expect(config.settings.ollamaThink).toBe(false);
+});
+
+test("ollamaThink is parsed from YAML", () => {
+  const yaml = `
+settings:
+  ollamaThink: true
+actions:
+  none:
+    active: false
+`;
+  const config = loadConfig(yaml);
+  expect(config.settings.ollamaThink).toBe(true);
+});
+
 test("l2MaxRetention defaults to 48", () => {
   const config = loadConfig(minimalYaml);
   expect(config.settings.l2MaxRetention).toBe(48);

@@ -13,10 +13,13 @@ export interface LlmInvoker {
 export function createOllamaAdapterFromConfig(config: {
   ollamaModel: string;
   ollamaBaseUrl: string;
-}): OllamaAdapter {
-  const llm = new ChatOllama({
+  ollamaThink: boolean;
+}, createInvoker: (fields: { model: string; baseUrl: string; think: boolean }) => LlmInvoker = (fields) =>
+  new ChatOllama(fields) as unknown as LlmInvoker): OllamaAdapter {
+  const llm = createInvoker({
     model: config.ollamaModel,
     baseUrl: config.ollamaBaseUrl,
+    think: config.ollamaThink,
   });
   return createOllamaAdapter(llm as unknown as LlmInvoker);
 }

@@ -7,6 +7,8 @@ settings:
   # Ollama configuration
   ollamaModel: gemma4:e2b
   ollamaBaseUrl: http://localhost:11434
+  # Enable model thinking/reasoning output mode (if supported by the model)
+  ollamaThink: false
 
   # Output directories
   logDir: ./logs

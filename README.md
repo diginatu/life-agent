@@ -68,6 +68,8 @@ To uninstall:
 
 All settings and actions are defined in `config.yml`. Use `--config <path>` to specify a different config file.
 
+Set `settings.ollamaThink: true` to enable Ollama thinking mode for all LLM calls.
+
 To add a custom action (e.g. hydration reminder), just add it to `config.yml`:
 
 ```yaml

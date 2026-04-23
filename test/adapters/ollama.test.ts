@@ -1,5 +1,9 @@
 import { test, expect, describe, spyOn, afterEach } from "bun:test";
-import { createOllamaAdapter, type LlmInvoker } from "../../src/adapters/ollama.ts";
+import {
+  createOllamaAdapter,
+  createOllamaAdapterFromConfig,
+  type LlmInvoker,
+} from "../../src/adapters/ollama.ts";
 
 function mockInvoker(responseContent: string): LlmInvoker {
   return {
@@ -14,6 +18,27 @@ function errorInvoker(error: Error): LlmInvoker {
 }
 
 describe("OllamaAdapter", () => {
+  describe("createOllamaAdapterFromConfig", () => {
+    test("passes think flag to ChatOllama config", async () => {
+      let capturedConfig: Record<string, unknown> | undefined;
+      const adapter = createOllamaAdapterFromConfig(
+        {
+          ollamaModel: "llama3:8b",
+          ollamaBaseUrl: "http://localhost:11434",
+          ollamaThink: true,
+        },
+        (config) => {
+          capturedConfig = config;
+          return mockInvoker("ok");
+        },
+      );
+
+      await adapter.generate("test");
+      expect(capturedConfig).toBeDefined();
+      expect(capturedConfig!.think).toBe(true);
+    });
+  });
+
   describe("generate (text-only)", () => {
     test("returns response text on success", async () => {
       const adapter = createOllamaAdapter(mockInvoker('{"answer": "hello"}'));

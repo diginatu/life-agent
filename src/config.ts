@@ -6,6 +6,7 @@ const SettingsSchema = z.object({
   webcamDevice: z.string().default("/dev/video0"),
   ollamaModel: z.string().default("gemma3:12b"),
   ollamaBaseUrl: z.url().default("http://localhost:11434"),
+  ollamaThink: z.boolean().default(false),
   logDir: z.string().default("./logs"),
   captureDir: z.string().default("./captures"),
   captureWidth: z.number().int().positive().default(640),
