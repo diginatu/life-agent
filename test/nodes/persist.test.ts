@@ -14,6 +14,8 @@ function mockFs(): FilesystemAdapter & { written: unknown[] } {
     readLastNLines: async () => [],
     readLastNLinesAcrossDays: async () => [],
     readAllLinesForDay: async () => [],
+    readEntriesSince: async () => [],
+    pruneEntriesBefore: async () => {},
   };
 }
 
@@ -104,6 +106,8 @@ describe("persist node", () => {
       readLastNLines: async () => [],
       readLastNLinesAcrossDays: async () => [],
       readAllLinesForDay: async () => [],
+      readEntriesSince: async () => [],
+      pruneEntriesBefore: async () => {},
     };
     const node = createPersistNode({ fs: failingFs, config: { logDir: "./logs" }, actionsConfig });
 

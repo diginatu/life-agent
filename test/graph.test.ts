@@ -57,6 +57,8 @@ function mockFs(lastEntries: unknown[] = []): FilesystemAdapter {
     readLastNLines: async () => lastEntries,
     readLastNLinesAcrossDays: async () => lastEntries,
     readAllLinesForDay: async () => [],
+    readEntriesSince: async () => [],
+    pruneEntriesBefore: async () => {},
   };
 }
 

@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 
 export interface FilesystemAdapter {
@@ -12,7 +12,10 @@ export interface FilesystemAdapter {
   ): Promise<unknown[]>;
   readAllLinesForDay(dir: string, date: string): Promise<unknown[]>;
   readEntriesSince(logDir: string, sinceIso: string, maxDays?: number): Promise<unknown[]>;
+  pruneEntriesBefore(logDir: string, beforeIso: string): Promise<void>;
 }
+
+const LOG_FILE_RE = /^(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
 export function createFilesystemAdapter(): FilesystemAdapter {
   return {
@@ -75,6 +78,54 @@ export function createFilesystemAdapter(): FilesystemAdapter {
       }
 
       return result;
+    },
+
+    async pruneEntriesBefore(logDir, beforeIso) {
+      let names: string[];
+      try {
+        names = await readdir(logDir);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "ENOENT") return;
+        throw error;
+      }
+
+      const before = new Date(beforeIso);
+      if (Number.isNaN(before.getTime())) {
+        throw new Error(`Invalid pruneEntriesBefore cutoff: ${beforeIso}`);
+      }
+
+      const boundaryDate = before.toISOString().slice(0, 10);
+
+      for (const name of names) {
+        const match = name.match(LOG_FILE_RE);
+        if (!match) continue;
+
+        const date = match[1]!;
+        const filePath = join(logDir, name);
+
+        if (date < boundaryDate) {
+          await unlink(filePath);
+          continue;
+        }
+
+        if (date > boundaryDate) {
+          continue;
+        }
+
+        const entries = await this.readAllLinesForDay(logDir, date);
+        const keptEntries = entries.filter((entry) => {
+          const timestamp = (entry as { timestamp?: string }).timestamp;
+          return timestamp == null || timestamp >= beforeIso;
+        });
+
+        if (keptEntries.length === 0) {
+          await unlink(filePath);
+          continue;
+        }
+
+        await Bun.write(filePath, `${keptEntries.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+      }
     },
 
     async readLastNLinesAcrossDays(dir, date, n, maxDaysBack = 1) {

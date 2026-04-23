@@ -190,6 +190,29 @@ describe("FilesystemAdapter", () => {
     });
   });
 
+  describe("pruneEntriesBefore", () => {
+    test("deletes older day files and trims the cutoff day", async () => {
+      const adapter = createFilesystemAdapter() as ReturnType<typeof createFilesystemAdapter> & {
+        pruneEntriesBefore(dir: string, beforeIso: string): Promise<void>;
+      };
+
+      await adapter.appendJsonLine(dir, "2026-04-14", { timestamp: "2026-04-14T23:00:00.000Z", i: 1 });
+      await adapter.appendJsonLine(dir, "2026-04-15", { timestamp: "2026-04-15T11:59:59.000Z", i: 2 });
+      await adapter.appendJsonLine(dir, "2026-04-15", { timestamp: "2026-04-15T12:00:00.000Z", i: 3 });
+      await adapter.appendJsonLine(dir, "2026-04-16", { timestamp: "2026-04-16T01:00:00.000Z", i: 4 });
+
+      await adapter.pruneEntriesBefore(dir, "2026-04-15T12:00:00.000Z");
+
+      expect(await Bun.file(join(dir, "2026-04-14.jsonl")).exists()).toBe(false);
+
+      const cutoffDayEntries = await adapter.readAllLinesForDay(dir, "2026-04-15");
+      expect(cutoffDayEntries).toEqual([{ timestamp: "2026-04-15T12:00:00.000Z", i: 3 }]);
+
+      const newerDayEntries = await adapter.readAllLinesForDay(dir, "2026-04-16");
+      expect(newerDayEntries).toEqual([{ timestamp: "2026-04-16T01:00:00.000Z", i: 4 }]);
+    });
+  });
+
   describe("readLastNLines", () => {
     test("returns empty array for non-existent file", async () => {
       const adapter = createFilesystemAdapter();

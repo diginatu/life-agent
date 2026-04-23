@@ -13,6 +13,7 @@ function mockFsSince(entries: unknown[]): FilesystemAdapter {
     readLastNLinesAcrossDays: async () => [],
     readAllLinesForDay: async () => [],
     readEntriesSince: async () => entries,
+    pruneEntriesBefore: async () => {},
   };
 }
 

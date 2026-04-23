@@ -20,13 +20,39 @@ function mockOllama(response = "hourly summary"): OllamaAdapter {
 }
 
 // entriesByDate: date string (UTC, e.g. "2026-04-15") -> array of log entries
-function mockFs(entriesByDate: Record<string, unknown[]> = {}): FilesystemAdapter {
+function mockFs(
+  entriesByDate: Record<string, unknown[]> = {},
+): FilesystemAdapter & { pruneEntriesBefore(dir: string, beforeIso: string): Promise<void> } {
+  const state = Object.fromEntries(
+    Object.entries(entriesByDate).map(([date, entries]) => [date, [...entries]]),
+  ) as Record<string, unknown[]>;
+
   return {
     appendJsonLine: async () => {},
     readLastNLines: async () => [],
     readLastNLinesAcrossDays: async () => [],
-    readAllLinesForDay: async (_dir, date) => entriesByDate[date] ?? [],
+    readAllLinesForDay: async (_dir, date) => [...(state[date] ?? [])],
     readEntriesSince: async () => [],
+    pruneEntriesBefore: async (_dir, beforeIso) => {
+      const boundaryDate = beforeIso.slice(0, 10);
+
+      for (const date of Object.keys(state)) {
+        if (date < boundaryDate) {
+          delete state[date];
+          continue;
+        }
+
+        if (date === boundaryDate) {
+          state[date] = state[date]!.filter((entry) => {
+            const timestamp = (entry as { timestamp?: string }).timestamp;
+            return timestamp == null || timestamp >= beforeIso;
+          });
+          if (state[date]!.length === 0) {
+            delete state[date];
+          }
+        }
+      }
+    },
   };
 }
 
@@ -531,6 +557,59 @@ describe("createLayerUpdateNode — L2 eviction deferred until after L3", () => 
     const l2Keys = l2Results.map((r: { key: string }) => r.key);
     expect(l2Keys).toContain(localHourKey(new Date("2026-04-15T07:00:00.000Z")));
     expect(l2Keys).toContain(localHourKey(new Date("2026-04-15T08:00:00.000Z")));
+  });
+});
+
+describe("createLayerUpdateNode — L1 pruning", () => {
+  let store: InMemoryStore;
+  beforeEach(() => { store = new InMemoryStore(); });
+
+  test("prunes raw logs after L3 rollup so evicted old L2 hours are not re-summarized", async () => {
+    const fs = mockFs({
+      "2026-04-15": [
+        { timestamp: "2026-04-15T01:05:00.000Z", summary: { activityGuess: "sleep", posture: "lying" }, decision: { action: "none", reason: "r" } },
+        { timestamp: "2026-04-15T02:10:00.000Z", summary: { activityGuess: "sleep", posture: "lying" }, decision: { action: "none", reason: "r" } },
+        { timestamp: "2026-04-15T07:15:00.000Z", summary: { activityGuess: "coding", posture: "sitting" }, decision: { action: "none", reason: "r" } },
+        { timestamp: "2026-04-15T08:20:00.000Z", summary: { activityGuess: "coding", posture: "sitting" }, decision: { action: "none", reason: "r" } },
+      ],
+    });
+
+    const firstRun = createLayerUpdateNode({
+      ollama: mockOllama("summary"),
+      fs,
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      l2MaxRetention: 2,
+      l3MaxRetention: 9999,
+      now: () => new Date("2026-04-15T18:01:00.000Z"),
+    });
+    await firstRun();
+
+    let secondRunGenerateCount = 0;
+    const countingOllama: OllamaAdapter = {
+      generate: async () => {
+        secondRunGenerateCount += 1;
+        return "summary";
+      },
+      generateWithImage: async () => "",
+    };
+
+    const secondRun = createLayerUpdateNode({
+      ollama: countingOllama,
+      fs,
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      l2MaxRetention: 2,
+      l3MaxRetention: 9999,
+      now: () => new Date("2026-04-15T18:15:00.000Z"),
+    });
+    await secondRun();
+
+    expect(secondRunGenerateCount).toBe(0);
   });
 });
 

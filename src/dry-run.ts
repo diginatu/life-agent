@@ -51,6 +51,9 @@ export function createDryRunDeps() {
     readLastNLinesAcrossDays: async () => [],
     readAllLinesForDay: async () => [],
     readEntriesSince: async () => [],
+    pruneEntriesBefore: async (_dir, beforeIso) => {
+      console.log(`[dry-run] Would prune raw log entries before ${beforeIso}`);
+    },
   };
 
   const discord: DiscordAdapter = {

@@ -14,7 +14,7 @@ Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore fo
 - **Config**: Zod-validated YAML (`config.yml` + `config.local.yml` override). Actions are data-driven.
 - **Discord reply loop**: `CollectFeedback` node reads the last log entry's Discord cursor (`discordMessageId` or `discordLastSeenMessageId`), fetches replies via `discord.collectReplies`, and puts them on `state.userFeedback`. The `Action` node injects those replies into the LLM prompt in the same run (no multi-run delay). `Persist` writes them back to the log entry as `feedbackFromPrevious` for audit / history.
 - **4-layer time-windowed memory**:
-  - **L1** — raw JSONL log entries in `logs/`. Read from latest L2 `windowEnd` to now (no count cap).
+  - **L1** — raw JSONL log entries in `logs/`. Read from latest L2 `windowEnd` to now. `LayerUpdate` prunes raw entries older than the first not-yet-eligible L3 bucket start, so L1 stays a hot working set instead of growing forever.
   - **L2** — hourly LLM summary, delayed by `l2DelayHours` (default 1h) so recent logs stay in L1. Keyed by local-time hour `YYYY-MM-DDTHH`. Capped at `l2MaxRetention` entries (default 48 ≈ 2 days).
   - **L3** — 6-hour LLM summary of L2 entries, delayed by `l3DelayHours` (default 6h). Buckets aligned to 00/06/12/18 UTC. Capped at `l3MaxRetention` entries (default 28 ≈ 7 days).
   - **L4** — single persistent-memory text (one entry at `["memory","L4"]` key `"current"`). On each L3 eviction, an LLM merges the current L4 text with the about-to-be-deleted L3 entry to produce a new concise distillation. Bounded by `l4MaxChars` (default 2000). Never auto-expires — only rewritten.
@@ -35,7 +35,7 @@ Installed as a systemd user service via `./install.sh`, which:
 Service is `Type=oneshot`, `WorkingDirectory={repo}`, runs `bun run src/index.ts --config {repo}/config.local.yml`. Timer fires `OnCalendar=*:0/15` with `Persistent=true` (catches missed runs after sleep) and `RandomizedDelaySec=30`. `After=ollama.service` — depends on the local Ollama service being up.
 
 Runtime paths (defaults in `src/config.ts`, relative to repo root which is the systemd WorkingDirectory):
-- `./logs/` — JSONL action logs
+- `./logs/` — JSONL action logs (hot raw history; older entries are pruned after they have safely rolled into L3)
 - `./captures/` — webcam frame snapshots
 - `./memory/store.json` — L2 hourly and L3 6-hour summaries (FileStore, namespaces `["memory","L2"]` and `["memory","L3"]`)
 - Web dashboard: `http://localhost:3000` (`bun run src/web/entry.ts`)

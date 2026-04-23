@@ -12,6 +12,8 @@ function mockFs(entries: unknown[] = []): FilesystemAdapter {
     readLastNLines: async () => entries,
     readLastNLinesAcrossDays: async () => entries,
     readAllLinesForDay: async () => [],
+    readEntriesSince: async () => [],
+    pruneEntriesBefore: async () => {},
   };
 }
 
@@ -170,6 +172,8 @@ describe("collect-feedback node", () => {
         return [{ discordMessageId: "msg-from-yesterday" }];
       },
       readAllLinesForDay: async () => [],
+      readEntriesSince: async () => [],
+      pruneEntriesBefore: async () => {},
     };
     const node = createCollectFeedbackNode({
       fs,

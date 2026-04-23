@@ -15,6 +15,7 @@ function mockFs(entries: unknown[] = []): FilesystemAdapter {
     readLastNLinesAcrossDays: async () => entries,
     readAllLinesForDay: async () => [],
     readEntriesSince: async () => entries,
+    pruneEntriesBefore: async () => {},
   };
 }
 
@@ -25,6 +26,7 @@ function mockFsWithSince(entries: unknown[], sinceEntries: unknown[]): Filesyste
     readLastNLinesAcrossDays: async () => entries,
     readAllLinesForDay: async () => [],
     readEntriesSince: async () => sinceEntries,
+    pruneEntriesBefore: async () => {},
   };
 }
 
@@ -35,6 +37,7 @@ function errorFs(): FilesystemAdapter {
     readLastNLinesAcrossDays: async () => { throw new Error("fs read error"); },
     readAllLinesForDay: async () => [],
     readEntriesSince: async () => [],
+    pruneEntriesBefore: async () => {},
   };
 }
 
@@ -290,6 +293,7 @@ describe("action node with history", () => {
         capturedSince = since;
         return historyEntries;
       },
+      pruneEntriesBefore: async () => {},
     };
     const now = new Date("2026-04-14T10:00:00.000Z");
     const node = createActionNode({
@@ -638,6 +642,7 @@ describe("action node with L2/L3 memory layers", () => {
         capturedSince = since;
         return [{ timestamp: "2026-04-14T09:00:00.000Z", summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "l1 no l2", confidence: 0.7 }, decision: { action: "none", reason: "no l2 entry" } }];
       },
+      pruneEntriesBefore: async () => {},
     };
 
     // now = 10:00, l2DelayHours = 1, cutoff = now - 2h = 08:00
@@ -688,6 +693,7 @@ describe("action node with L2/L3 memory layers", () => {
         capturedSince = since;
         return [];
       },
+      pruneEntriesBefore: async () => {},
     };
 
     const node = createActionNode({

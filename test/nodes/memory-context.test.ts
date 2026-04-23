@@ -10,6 +10,7 @@ function fsReturning(entries: unknown[]): FilesystemAdapter {
     readLastNLinesAcrossDays: async () => [],
     readAllLinesForDay: async () => [],
     readEntriesSince: async () => entries,
+    pruneEntriesBefore: async () => {},
   };
 }
 
@@ -23,6 +24,7 @@ function fsCapturingSince(entries: unknown[], capture: { since?: string }): File
       capture.since = since;
       return entries;
     },
+    pruneEntriesBefore: async () => {},
   };
 }
 
@@ -199,6 +201,7 @@ describe("loadMemoryContext", () => {
       readEntriesSince: async () => {
         throw new Error("fs down");
       },
+      pruneEntriesBefore: async () => {},
     };
 
     const ctx = await loadMemoryContext({

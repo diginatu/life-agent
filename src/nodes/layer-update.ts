@@ -215,7 +215,11 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
       }
     }
 
-    // --- Phase 3: L2 eviction (safe — L3 has already consumed what it needs) ---
+    // --- Phase 3: L1 pruning (safe — L3 has already consumed older raw logs) ---
+    const l1PruneCutoff = new Date(l3Cutoff.getTime() + L3_BUCKET_MS).toISOString();
+    await deps.fs.pruneEntriesBefore(deps.logDir, l1PruneCutoff);
+
+    // --- Phase 4: L2 eviction (safe — L3 has already consumed what it needs) ---
     const allL2Final = await deps.store.search(L2_NAMESPACE as unknown as string[], {
       limit: 10000,
     });

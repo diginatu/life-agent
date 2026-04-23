@@ -41,6 +41,7 @@ function emptyFs(): FilesystemAdapter {
     readLastNLinesAcrossDays: async () => [],
     readAllLinesForDay: async () => [],
     readEntriesSince: async () => [],
+    pruneEntriesBefore: async () => {},
   };
 }
 
@@ -160,6 +161,7 @@ describe("summarize node", () => {
       ],
       readAllLinesForDay: async () => [],
       readEntriesSince: async () => [],
+      pruneEntriesBefore: async () => {},
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -206,6 +208,7 @@ describe("summarize node", () => {
       ],
       readAllLinesForDay: async () => [],
       readEntriesSince: async () => [],
+      pruneEntriesBefore: async () => {},
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -228,6 +231,7 @@ describe("summarize node", () => {
       readLastNLinesAcrossDays: async () => { throw new Error("disk error"); },
       readAllLinesForDay: async () => [],
       readEntriesSince: async () => [],
+      pruneEntriesBefore: async () => {},
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -272,6 +276,7 @@ describe("summarize node", () => {
       ],
       readAllLinesForDay: async () => [],
       readEntriesSince: async () => [],
+      pruneEntriesBefore: async () => {},
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -302,6 +307,7 @@ describe("summarize node", () => {
       ],
       readAllLinesForDay: async () => [],
       readEntriesSince: async () => [],
+      pruneEntriesBefore: async () => {},
     };
     const node = createSummarizeNode({
       ...baseDeps,
@@ -349,6 +355,7 @@ describe("summarize node", () => {
       ],
       readAllLinesForDay: async () => [],
       readEntriesSince: async () => [],
+      pruneEntriesBefore: async () => {},
     };
     const node = createSummarizeNode({
       ...baseDeps,
