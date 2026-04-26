@@ -16,14 +16,6 @@ actions:
       body: Take a short break.
 `);
 
-const summary = {
-  personPresent: true,
-  posture: "sitting",
-  scene: "desk",
-  activityGuess: "coding",
-  confidence: 0.8,
-};
-
 function createOllamaMock(response: string, calls: string[]): OllamaAdapter {
   return {
     generate: async (prompt: string) => {
@@ -50,9 +42,11 @@ test("plan node generates and stores a plan when no cache exists", async () => {
     now: () => now,
   });
 
-  const result = await node({ summary });
+  const result = await node({});
 
   expect(calls.length).toBe(1);
+  expect(calls[0]).not.toContain("Scene analysis:");
+  expect(calls[0]).not.toContain("- Scene:");
   expect(result.errors).toBeUndefined();
   expect(result.plan).toBeDefined();
   expect(result.plan?.generatedAt).toBe("2026-04-24T10:00:00.000Z");
@@ -108,9 +102,11 @@ test("plan node regenerates after expiry", async () => {
     now: () => new Date("2026-04-24T10:00:00.000Z"),
   });
 
-  const result = await node({ summary });
+  const result = await node({});
 
   expect(calls.length).toBe(1);
+  expect(calls[0]).toContain("24-hour plan:");
+  expect(calls[0]).toContain("old plan");
   expect(result.plan?.items[0]?.reason).toBe("new cycle");
   expect(result.plan?.validUntil).toBe("2026-04-25T10:00:00.000Z");
 });
@@ -132,7 +128,7 @@ test("plan node returns stale cache when regeneration fails", async () => {
     now: () => new Date("2026-04-24T10:00:00.000Z"),
   });
 
-  const result = await node({ summary });
+  const result = await node({});
 
   expect(calls.length).toBe(1);
   expect(result.plan).toEqual(stale);
@@ -140,4 +136,26 @@ test("plan node returns stale cache when regeneration fails", async () => {
 
   const stored = await store.get(["memory", "plan"], "current");
   expect(PlanSchema.parse(stored?.value)).toEqual(stale);
+});
+
+test("plan node generates without summary when cache is missing", async () => {
+  const calls: string[] = [];
+  const store = new InMemoryStore();
+  const node = createPlanNode({
+    ollama: createOllamaMock(
+      JSON.stringify({
+        items: [{ time: "10:30", action: "nudge_break", reason: "reset focus" }],
+      }),
+      calls,
+    ),
+    actionsConfig: config,
+    store,
+    now: () => new Date("2026-04-24T10:00:00.000Z"),
+  });
+
+  const result = await node({});
+
+  expect(calls.length).toBe(1);
+  expect(result.errors).toBeUndefined();
+  expect(result.plan?.items[0]?.action).toBe("nudge_break");
 });

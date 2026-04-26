@@ -5,10 +5,10 @@ import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { Config } from "../config.ts";
 import type { Plan } from "../schemas/plan.ts";
 import { PlanSchema } from "../schemas/plan.ts";
-import type { SceneSummary } from "../schemas/summary.ts";
 import { formatTime } from "./format-time.ts";
 import { formatUserFeedback, type UserFeedbackEntry } from "./history-format.ts";
 import { formatMemoryContext, loadMemoryContext } from "./memory-context.ts";
+import { formatPlanContext } from "./plan-format.ts";
 
 const PLAN_NAMESPACE = ["memory", "plan"] as const;
 const PLAN_KEY = "current";
@@ -25,7 +25,6 @@ interface PlanNodeDeps {
 }
 
 interface PlanNodeState {
-  summary?: SceneSummary;
   userFeedback?: UserFeedbackEntry[];
 }
 
@@ -53,9 +52,9 @@ function isPlanFresh(plan: Plan, now: Date): boolean {
 }
 
 function buildPrompt(
-  summary: SceneSummary,
   actionsConfig: Config,
   currentTime: Date,
+  previousPlan: Plan | undefined,
   memorySection: string,
   userFeedback?: UserFeedbackEntry[],
 ): string {
@@ -67,18 +66,14 @@ function buildPrompt(
     })
     .join("\n");
 
-  const historySections = formatUserFeedback(userFeedback, currentTime) + memorySection;
+  const historySections =
+    formatUserFeedback(userFeedback, currentTime)
+    + formatPlanContext(previousPlan)
+    + memorySection;
 
   return `You are a personal assistant. Create a practical plan for the next 24 hours.
 The plan should describe likely timings and actions the assistant will take over the next day.
-Use current scene context, user feedback, and memory to keep it realistic and useful.
-
-Scene analysis:
-- Person present: ${summary.personPresent}
-- Posture: ${summary.posture}
-- Scene: ${summary.scene}
-- Activity: ${summary.activityGuess ?? "unknown"}
-- Confidence: ${summary.confidence}
+Use user feedback, previous plans, and memory to keep it realistic and useful.
 
 Current time:
 - ${formatTime(currentTime)}
@@ -122,13 +117,6 @@ export function createPlanNode(deps: PlanNodeDeps) {
       return { plan: cachedPlan };
     }
 
-    if (!state.summary) {
-      return {
-        plan: cachedPlan,
-        errors: ["plan: no summary data in state and no fresh cached plan"],
-      };
-    }
-
     const memory = await loadMemoryContext({
       store: deps.store,
       fs: deps.fs,
@@ -138,9 +126,9 @@ export function createPlanNode(deps: PlanNodeDeps) {
     });
 
     const prompt = buildPrompt(
-      state.summary,
       deps.actionsConfig,
       currentTime,
+      cachedPlan,
       formatMemoryContext(memory, currentTime),
       state.userFeedback,
     );
