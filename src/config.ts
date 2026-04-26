@@ -4,9 +4,15 @@ import { DEFAULT_L4_MAX_CHARS, DEFAULT_L4_PROMPT } from "./memory/constants.ts";
 
 const SettingsSchema = z.object({
   webcamDevice: z.string().default("/dev/video0"),
+  // Global Ollama LLM model used by most nodes
   ollamaModel: z.string().default("gemma3:12b"),
   ollamaBaseUrl: z.url().default("http://localhost:11434"),
   ollamaThink: z.boolean().default(false),
+  // Optional per-node overrides for the Plan node. If not provided, fall back
+  // to the global ollamaModel / ollamaThink settings to preserve existing
+  // behavior.
+  planOllamaModel: z.string().optional(),
+  planOllamaThink: z.boolean().optional(),
   logDir: z.string().default("./logs"),
   captureDir: z.string().default("./captures"),
   captureWidth: z.number().int().positive().default(640),

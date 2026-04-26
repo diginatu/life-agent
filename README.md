@@ -70,6 +70,12 @@ All settings and actions are defined in `config.yml`. Use `--config <path>` to s
 
 Set `settings.ollamaThink: true` to enable Ollama thinking mode for all LLM calls.
 
+Plan node overrides
+ - You can optionally configure the Plan node to use a different LLM model or think-mode by setting:
+   - `settings.planOllamaModel: <model>`
+   - `settings.planOllamaThink: <true|false>`
+ - When either `planOllamaModel` or `planOllamaThink` is not present, the Plan node will fall back to the global `settings.ollamaModel` / `settings.ollamaThink` values to preserve existing behavior.
+
 To add a custom action (e.g. hydration reminder), just add it to `config.yml`:
 
 ```yaml

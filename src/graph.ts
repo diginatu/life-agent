@@ -44,7 +44,17 @@ function logNodeHeader(name: string, index: number): void {
 export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   const s = config.settings;
   const ffmpeg = deps.ffmpeg ?? createFfmpegAdapter();
+  // Global Ollama adapter used by most nodes
   const ollama = deps.ollama ?? createOllamaAdapterFromConfig(s);
+  // Plan node gets an adapter that may use per-node overrides defined in
+  // settings (planOllamaModel / planOllamaThink). Fall back to the global
+  // settings when the overrides are not present.
+  const planSettings = {
+    ollamaModel: s.planOllamaModel ?? s.ollamaModel,
+    ollamaBaseUrl: s.ollamaBaseUrl,
+    ollamaThink: s.planOllamaThink ?? s.ollamaThink,
+  };
+  const planOllama = deps.ollama ?? createOllamaAdapterFromConfig(planSettings);
   const fs = deps.fs ?? createFilesystemAdapter();
   let discord: DiscordAdapter | undefined = deps.discord;
   if (!discord && s.discordChannelId) {
@@ -127,7 +137,9 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
   });
 
   const planNode = createPlanNode({
-    ollama,
+    // Provide the plan-specific Ollama adapter so the Plan node can use
+    // a different model or think-mode when configured.
+    ollama: planOllama,
     actionsConfig: config,
     fs,
     logDir: s.logDir,

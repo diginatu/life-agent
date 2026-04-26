@@ -9,6 +9,14 @@ settings:
   ollamaBaseUrl: http://localhost:11434
   # Enable model thinking/reasoning output mode (if supported by the model)
   ollamaThink: false
+  # Optional per-node override for the Plan node. If set, the Plan node will
+  # use this model instead of the global `ollamaModel`. Leave empty to inherit
+  # the global model.
+  # planOllamaModel: gemma4:e2b
+  # Optional per-node thinking (reasoning) override for the Plan node. When
+  # true, the Plan node will enable Ollama's "think" mode regardless of the
+  # global `ollamaThink` setting. Leave empty to inherit the global setting.
+  # planOllamaThink: false
 
   # Output directories
   logDir: ./logs
