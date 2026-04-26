@@ -4,9 +4,11 @@ import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { Config } from "../config.ts";
 import type { ActionSelection } from "../schemas/action.ts";
 import { type DraftMessage, DraftMessageSchema } from "../schemas/message.ts";
+import type { Plan } from "../schemas/plan.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import { formatUserFeedback, type UserFeedbackEntry } from "./history-format.ts";
 import { formatMemoryContext, loadMemoryContext } from "./memory-context.ts";
+import { formatPlanContext } from "./plan-format.ts";
 
 interface MessageNodeDeps {
   ollama: OllamaAdapter;
@@ -21,6 +23,7 @@ interface MessageNodeDeps {
 interface MessageNodeState {
   summary?: SceneSummary;
   decision?: ActionSelection;
+  plan?: Plan;
   userFeedback?: UserFeedbackEntry[];
 }
 
@@ -41,6 +44,7 @@ function buildPrompt(
   summary: SceneSummary,
   decision: ActionSelection,
   responseStyle: string,
+  planSection: string,
   memorySection: string,
   currentTime: Date,
   actionDescription?: string,
@@ -59,6 +63,8 @@ Context:
 - Activity: ${summary.activityGuess ?? "unknown"}
 - Posture: ${summary.posture}
 ${feedbackSection}${memorySection}
+${planSection}
+Use the 24-hour plan as guidance, but prioritize the current scene and latest user feedback.
 Return a JSON object with exactly this field:
 {
   "body": string (the message content; may be multiple sentences)
@@ -109,6 +115,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       state.summary,
       state.decision,
       actionsConfig.settings.responseStyle,
+      formatPlanContext(state.plan),
       formatMemoryContext(memory, currentTime),
       currentTime,
       actionDescription,

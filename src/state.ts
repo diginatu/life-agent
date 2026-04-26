@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 import { ActionSelectionSchema } from "./schemas/action.ts";
 import { CaptureResultSchema } from "./schemas/capture.ts";
 import { DraftMessageSchema } from "./schemas/message.ts";
+import { PlanSchema } from "./schemas/plan.ts";
 import { SceneSummarySchema } from "./schemas/summary.ts";
 
 export const UserFeedbackSchema = z.array(
@@ -16,6 +17,7 @@ export const UserFeedbackSchema = z.array(
 export const GraphState = new StateSchema({
   capture: CaptureResultSchema.optional(),
   summary: SceneSummarySchema.optional(),
+  plan: PlanSchema.optional(),
   decision: ActionSelectionSchema.optional(),
   message: DraftMessageSchema.nullable().optional(),
   userFeedback: UserFeedbackSchema.optional(),

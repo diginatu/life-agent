@@ -4,7 +4,7 @@ Life Agent captures webcam images, analyzes them with a local LLM (Ollama), and 
 
 ## Architecture
 
-7-node LangGraph pipeline: Capture → CollectFeedback → Summarize → Action → Message → Persist → LayerUpdate.
+8-node LangGraph pipeline: Capture → CollectFeedback → Summarize → Plan → Action → Message → Persist → LayerUpdate.
 Each node is a factory function (`createXxxNode(deps)`) returning an async state handler.
 Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore for dry-run) accessible via `config.store` in nodes.
 

@@ -17,6 +17,16 @@ const actionJson = JSON.stringify({
   reason: "user has been sitting at desk for a while",
 });
 
+const planJson = JSON.stringify({
+  items: [
+    {
+      time: "within the next hour",
+      action: "nudge_break",
+      reason: "encourage a short reset",
+    },
+  ],
+});
+
 const messageJson = JSON.stringify({
   title: "Time for a stretch!",
   body: "You've been coding for a while. Stand up and move around for a few minutes.",
@@ -25,7 +35,7 @@ const messageJson = JSON.stringify({
 export function createDryRunDeps() {
   let generateCallIndex = 0;
   const extractMemoriesJson = "[]"; // no patterns extracted in dry-run
-  const generateResponses = [actionJson, messageJson, extractMemoriesJson];
+  const generateResponses = [planJson, actionJson, messageJson, extractMemoriesJson];
 
   const ffmpeg: FfmpegAdapter = {
     captureFrame: async (_device, outputPath) => {

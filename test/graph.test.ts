@@ -1,4 +1,5 @@
 import { test, expect, describe } from "bun:test";
+import { InMemoryStore } from "@langchain/langgraph";
 import { buildGraph } from "../src/graph.ts";
 import type { FfmpegAdapter } from "../src/adapters/ffmpeg.ts";
 import type { OllamaAdapter } from "../src/adapters/ollama.ts";
@@ -26,12 +27,15 @@ const validActionJson = JSON.stringify({
   reason: "user has been sitting for a while",
 });
 
+const validPlanJson = JSON.stringify({
+  items: [{ time: "14:15", action: "nudge_break", reason: "encourage a short reset" }],
+});
+
 const validMessageJson = JSON.stringify({
   body: "Time for a break! You've been coding for a while. Stand up and stretch.",
 });
 
-// generate() is called by action node first, then message node
-// Return action JSON on first call, message JSON on second
+// generate() is called by plan node first, then action node, then message node
 function mockOllama(overrides?: {
   generateResponses?: string[];
   generateWithImage?: string;
@@ -44,7 +48,7 @@ function mockOllama(overrides?: {
     };
   }
   let callIndex = 0;
-  const responses = overrides?.generateResponses ?? [validActionJson, validMessageJson];
+  const responses = overrides?.generateResponses ?? [validPlanJson, validActionJson, validMessageJson];
   return {
     generate: async () => responses[callIndex++] ?? validActionJson,
     generateWithImage: async () => overrides?.generateWithImage ?? validSummaryJson,
@@ -80,6 +84,7 @@ function allMocks(overrides: {
       error: overrides.ollamaError,
     }),
     fs: mockFs(overrides.fsEntries ?? []),
+    store: new InMemoryStore(),
     readFileBase64: mockReadFile,
     now: () => new Date("2026-03-29T14:00:00"),
   };
@@ -123,7 +128,7 @@ describe("buildGraph (full pipeline)", () => {
     expect(result.errors.some((e: string) => e.includes("ollama"))).toBe(true);
   });
 
-  test("logs a header separator before each of the 7 pipeline nodes", async () => {
+  test("logs a header separator before each of the 8 pipeline nodes", async () => {
     const logs: string[] = [];
     const original = console.log;
     console.log = (...args: unknown[]) => {
@@ -140,16 +145,17 @@ describe("buildGraph (full pipeline)", () => {
       "capture_node",
       "collect_feedback_node",
       "summarize_node",
+      "plan_node",
       "action_node",
       "message_node",
       "persist_node",
       "layer_update_node",
     ];
     const headers = logs.filter((line) => /==========.*==========/.test(line));
-    expect(headers.length).toBe(7);
+    expect(headers.length).toBe(8);
     nodeOrder.forEach((name, i) => {
       expect(headers[i]).toContain(name);
-      expect(headers[i]).toContain(`[${i + 1}/7]`);
+      expect(headers[i]).toContain(`[${i + 1}/8]`);
     });
     // extract_memories_node must not appear
     expect(headers.some((h) => h.includes("extract_memories_node"))).toBe(false);
@@ -160,7 +166,9 @@ describe("buildGraph (full pipeline)", () => {
       action: "none",
       reason: "routine check",
     });
-    const graph = await buildGraph(config, allMocks({ ollamaGenerateResponses: [noneAction] }));
+    const graph = await buildGraph(config, allMocks({
+      ollamaGenerateResponses: [validPlanJson, noneAction],
+    }));
     const result = await graph.invoke({});
 
     expect(result.decision!.action).toBe("none");

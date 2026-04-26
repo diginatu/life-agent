@@ -14,6 +14,7 @@ import { createCaptureNode } from "./nodes/capture.ts";
 import { createCollectFeedbackNode } from "./nodes/collect-feedback.ts";
 import { createLayerUpdateNode } from "./nodes/layer-update.ts";
 import { createMessageNode } from "./nodes/message.ts";
+import { createPlanNode } from "./nodes/plan.ts";
 import { createPersistNode } from "./nodes/persist.ts";
 import { createSummarizeNode } from "./nodes/summarize.ts";
 import { GraphState } from "./state.ts";
@@ -35,7 +36,7 @@ async function readFileBase64(path: string): Promise<string> {
   return Buffer.from(buffer).toString("base64");
 }
 
-const PIPELINE_NODE_COUNT = 7;
+const PIPELINE_NODE_COUNT = 8;
 function logNodeHeader(name: string, index: number): void {
   console.log(`\n========== [${index}/${PIPELINE_NODE_COUNT}] ${name} ==========`);
 }
@@ -125,6 +126,16 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     now: deps.now,
   });
 
+  const planNode = createPlanNode({
+    ollama,
+    actionsConfig: config,
+    fs,
+    logDir: s.logDir,
+    store,
+    l2DelayHours: s.l2DelayHours,
+    now: deps.now,
+  });
+
   return new StateGraph(GraphState)
     .addNode("capture_node", async (state) => {
       logNodeHeader("capture_node", 1);
@@ -138,26 +149,31 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
       logNodeHeader("summarize_node", 3);
       return summarizeNode(state);
     })
+    .addNode("plan_node", async (state) => {
+      logNodeHeader("plan_node", 4);
+      return planNode(state);
+    })
     .addNode("action_node", async (state) => {
-      logNodeHeader("action_node", 4);
+      logNodeHeader("action_node", 5);
       return actionNode(state);
     })
     .addNode("message_node", async (state) => {
-      logNodeHeader("message_node", 5);
+      logNodeHeader("message_node", 6);
       return messageNode(state);
     })
     .addNode("persist_node", async (state) => {
-      logNodeHeader("persist_node", 6);
+      logNodeHeader("persist_node", 7);
       return persistNode(state);
     })
     .addNode("layer_update_node", async () => {
-      logNodeHeader("layer_update_node", 7);
+      logNodeHeader("layer_update_node", 8);
       return layerUpdateNode();
     })
     .addEdge(START, "capture_node")
     .addEdge("capture_node", "collect_feedback_node")
     .addEdge("collect_feedback_node", "summarize_node")
-    .addEdge("summarize_node", "action_node")
+    .addEdge("summarize_node", "plan_node")
+    .addEdge("plan_node", "action_node")
     .addEdge("action_node", "message_node")
     .addEdge("message_node", "persist_node")
     .addEdge("persist_node", "layer_update_node")

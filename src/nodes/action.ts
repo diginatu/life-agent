@@ -3,10 +3,12 @@ import type { FilesystemAdapter } from "../adapters/filesystem.ts";
 import type { OllamaAdapter } from "../adapters/ollama.ts";
 import type { Config } from "../config.ts";
 import { type ActionSelection, ActionSelectionSchema } from "../schemas/action.ts";
+import type { Plan } from "../schemas/plan.ts";
 import type { SceneSummary } from "../schemas/summary.ts";
 import { formatTime } from "./format-time.ts";
 import { formatUserFeedback, type UserFeedbackEntry } from "./history-format.ts";
 import { formatMemoryContext, loadMemoryContext } from "./memory-context.ts";
+import { formatPlanContext } from "./plan-format.ts";
 
 interface ActionNodeDeps {
   ollama: OllamaAdapter;
@@ -20,6 +22,7 @@ interface ActionNodeDeps {
 
 interface ActionNodeState {
   summary?: SceneSummary;
+  plan?: Plan;
   userFeedback?: UserFeedbackEntry[];
 }
 
@@ -45,6 +48,7 @@ function buildPrompt(
   summary: SceneSummary,
   actionsConfig: Config,
   currentTime: Date,
+  planSection: string,
   memorySection: string,
   userFeedback?: UserFeedbackEntry[],
 ): string {
@@ -56,7 +60,7 @@ function buildPrompt(
     })
     .join("\n");
 
-  const historySections = formatUserFeedback(userFeedback, currentTime) + memorySection;
+  const historySections = formatUserFeedback(userFeedback, currentTime) + planSection + memorySection;
 
   return `You are a personal assistant. Based on the scene analysis and history, select the most appropriate action.
 
@@ -76,6 +80,8 @@ Available actions:
 ${actionDescriptions}
 
 ${!userFeedback || userFeedback.length === 0 ? '\nIMPORTANT: There are no new user messages in this cycle. Do NOT just "reply"' : '\nIMPORTANT: The user has sent a new message this cycle.'}
+${userFeedback && userFeedback.length > 0 ? '\nIMPORTANT: When there is a new user message, do not choose "none" unless truly unavoidable.' : ""}
+IMPORTANT: If the 24-hour plan conflicts with the current scene or latest user feedback, prioritize current scene and latest user feedback.
 You MUST choose an action from the available actions list above. Return a JSON object with exactly these fields:
 {
   "reason": string explaining your choice
@@ -109,6 +115,7 @@ export function createActionNode(deps: ActionNodeDeps) {
       state.summary,
       deps.actionsConfig,
       currentTime,
+      formatPlanContext(state.plan),
       formatMemoryContext(memory, currentTime),
       state.userFeedback,
     );
