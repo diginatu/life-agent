@@ -49,7 +49,18 @@ function makeState(action: string, overrides: Record<string, unknown> = {}) {
   return {
     summary: baseSummary,
     decision: {
-      action,
+      actions: [action],
+      reason: "test reason",
+    },
+    ...overrides,
+  };
+}
+
+function makeMultiState(actions: string[], overrides: Record<string, unknown> = {}) {
+  return {
+    summary: baseSummary,
+    decision: {
+      actions,
       reason: "test reason",
     },
     ...overrides,
@@ -82,6 +93,33 @@ describe("message node", () => {
 
     expect(result.message).toBeDefined();
     expect(result.message!.body).toContain("bed");
+  });
+
+  test("drafts one message for multiple active actions", async () => {
+    let capturedPrompt = "";
+    const capturingOllama: OllamaAdapter = {
+      generate: async (prompt) => {
+        capturedPrompt = prompt;
+        return validMessageJson;
+      },
+      generateWithImage: async () => validMessageJson,
+    };
+    const node = createMessageNode({ ollama: capturingOllama, actionsConfig });
+    const result = await node(makeMultiState(["nudge_break", "nudge_sleep"]));
+
+    expect(result.message).toBeDefined();
+    expect(capturedPrompt).toContain("Actions: nudge_break, nudge_sleep");
+    expect(capturedPrompt).toContain("Suggest the user take a short break");
+    expect(capturedPrompt).toContain("Suggest the user go to sleep");
+  });
+
+  test("uses combined fallback text for multiple active actions", async () => {
+    const node = createMessageNode({ ollama: mockOllama("not json"), actionsConfig });
+    const result = await node(makeMultiState(["nudge_break", "nudge_sleep"]));
+
+    expect(result.message).toBeDefined();
+    expect(result.message!.body).toContain("Time for a break");
+    expect(result.message!.body).toContain("Time to wind down");
   });
 
   test("output matches DraftMessageSchema", async () => {
@@ -207,7 +245,7 @@ describe("message node with memory layers", () => {
       {
         timestamp: "2026-04-14T08:05:00.000Z",
         summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
-        decision: { action: "none", reason: "l1 msg entry" },
+        decision: { actions: ["none"], reason: "l1 msg entry" },
       },
     ];
 

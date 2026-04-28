@@ -35,10 +35,12 @@ export function createPersistNode(deps: PersistNodeDeps) {
 
     // Send Discord message for active actions
     let discordMessageId: string | null = null;
+    const selectedActions = state.decision?.actions ?? [];
+    const hasActiveAction = selectedActions.some((action) => actionsConfig.isActiveAction(action));
     if (
       discord &&
       state.decision &&
-      actionsConfig.isActiveAction(state.decision.action) &&
+      hasActiveAction &&
       state.message
     ) {
       try {
@@ -97,7 +99,7 @@ export function createPersistNode(deps: PersistNodeDeps) {
     }
 
     // Print one-line summary
-    const action = state.decision?.action ?? "unknown";
+    const action = selectedActions.length > 0 ? selectedActions.join(",") : "unknown";
     const preview = state.message?.body
       ? ` "${state.message.body.slice(0, 60)}${state.message.body.length > 60 ? "…" : ""}"`
       : "";

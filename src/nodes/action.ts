@@ -32,7 +32,7 @@ interface ActionNodeResult {
 }
 
 const FALLBACK_DECISION: ActionSelection = {
-  action: "none",
+  actions: ["none"],
   reason: "fallback: action selection failed",
 };
 
@@ -62,7 +62,7 @@ function buildPrompt(
 
   const historySections = formatUserFeedback(userFeedback, currentTime) + planSection + memorySection;
 
-  return `You are a personal assistant. Based on the scene analysis and history, select the most appropriate action.
+  return `You are a personal assistant. Based on the scene analysis and history, select one or more appropriate actions.
 
 Scene analysis:
 - Person present: ${summary.personPresent}
@@ -82,11 +82,13 @@ ${actionDescriptions}
 ${!userFeedback || userFeedback.length === 0 ? '\nIMPORTANT: There are no new user messages in this cycle. Do NOT just "reply"' : '\nIMPORTANT: The user has sent a new message this cycle.'}
 ${userFeedback && userFeedback.length > 0 ? '\nIMPORTANT: When there is a new user message, do not choose "none" unless truly unavoidable.' : ""}
 IMPORTANT: If the 24-hour plan conflicts with the current scene or latest user feedback, prioritize current scene and latest user feedback.
-You MUST choose an action from the available actions list above. Return a JSON object with exactly these fields:
+You MUST choose one or more actions from the available actions list above. Return a JSON object with exactly these fields:
 {
   "reason": string explaining your choice
-  "action": one of ${JSON.stringify(allActions)},
+  "actions": array of unique actions chosen from ${JSON.stringify(allActions)},
 }
+
+IMPORTANT: If you choose "none", it must be the only selected action.
 
 Return ONLY the JSON object, no other text.`;
 }

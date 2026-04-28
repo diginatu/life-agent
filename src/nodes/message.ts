@@ -47,17 +47,18 @@ function buildPrompt(
   planSection: string,
   memorySection: string,
   currentTime: Date,
-  actionDescription?: string,
+  actionDescriptions: string,
   userFeedback?: UserFeedbackEntry[],
 ): string {
-  const descLine = actionDescription ? `\n- Action description: ${actionDescription}` : "";
   const feedbackSection = formatUserFeedback(userFeedback, currentTime);
   return `You are a personal assistant. Draft a mention post for the user according to the context.
 This message will be posted in a Discord channel and will mention the user. Do no include the mention in the body.
 Follow this response style: ${responseStyle}.
 
 Context:
-- Action: ${decision.action}${descLine}
+- Actions: ${decision.actions.join(", ")}
+- Action descriptions:
+${actionDescriptions}
 - Reason: ${decision.reason}
 - Scene: ${summary.scene}
 - Activity: ${summary.activityGuess ?? "unknown"}
@@ -76,10 +77,17 @@ Return ONLY the JSON object, no other text.`;
 export function createMessageNode(deps: MessageNodeDeps) {
   const { actionsConfig } = deps;
 
-  function getFallback(action: string): DraftMessage {
-    return (
-      actionsConfig.getFallbackMessage(action) ?? { body: "Life Agent has a suggestion for you." }
-    );
+  function getFallback(actions: string[]): DraftMessage {
+    const fallbackBodies = actions
+      .filter((action) => actionsConfig.isActiveAction(action))
+      .map((action) => actionsConfig.getFallbackMessage(action)?.body)
+      .filter((body): body is string => Boolean(body));
+
+    if (fallbackBodies.length === 0) {
+      return { body: "Life Agent has a suggestion for you." };
+    }
+
+    return { body: fallbackBodies.join("\n") };
   }
 
   return async (state: MessageNodeState): Promise<MessageNodeResult> => {
@@ -87,18 +95,25 @@ export function createMessageNode(deps: MessageNodeDeps) {
       return { message: null, errors: ["message: no decision data in state"] };
     }
 
-    if (!actionsConfig.isActiveAction(state.decision.action)) {
+    const selectedActions = state.decision.actions;
+    const hasActiveAction = selectedActions.some((action) => actionsConfig.isActiveAction(action));
+    if (!hasActiveAction) {
       return { message: null };
     }
 
     if (!state.summary) {
       return {
-        message: getFallback(state.decision.action),
+        message: getFallback(selectedActions),
         errors: ["message: no summary data, using fallback message"],
       };
     }
 
-    const actionDescription = actionsConfig.getDescription(state.decision.action);
+    const actionDescriptions = selectedActions
+      .map((action) => {
+        const description = actionsConfig.getDescription(action);
+        return description ? `  - ${action}: ${description}` : `  - ${action}`;
+      })
+      .join("\n");
 
     const now = deps.now ?? (() => new Date());
     const currentTime = now();
@@ -118,7 +133,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       formatPlanContext(state.plan),
       formatMemoryContext(memory, currentTime),
       currentTime,
-      actionDescription,
+      actionDescriptions,
       state.userFeedback,
     );
 
@@ -129,7 +144,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       const msg = `message: ollama error: ${err instanceof Error ? err.message : String(err)}`;
       console.error(msg);
       return {
-        message: getFallback(state.decision.action),
+        message: getFallback(selectedActions),
         errors: [msg],
       };
     }
@@ -143,7 +158,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       const msg = `message: failed to parse JSON: ${jsonStr.slice(0, 200)}`;
       console.error(msg);
       return {
-        message: getFallback(state.decision.action),
+        message: getFallback(selectedActions),
         errors: [msg],
       };
     }
@@ -153,7 +168,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       const msg = `message: schema validation failed: ${JSON.stringify(result.error.issues)}`;
       console.error(msg);
       return {
-        message: getFallback(state.decision.action),
+        message: getFallback(selectedActions),
         errors: [msg],
       };
     }

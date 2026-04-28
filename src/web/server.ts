@@ -78,8 +78,11 @@ const HTML_PAGE = `<!DOCTYPE html>
         return;
       }
       container.innerHTML = entries.map(e => {
-        const action = e.decision?.action ?? "unknown";
-        const isActive = !PASSIVE.has(action);
+        const actions = Array.isArray(e.decision?.actions)
+          ? e.decision.actions
+          : (e.decision?.action ? [e.decision.action] : []);
+        const action = actions.length > 0 ? actions.join(", ") : "unknown";
+        const isActive = actions.some(a => !PASSIVE.has(a));
         const cls = isActive ? "active" : "passive";
         const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : "?";
         const scene = e.summary?.scene ?? "";

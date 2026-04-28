@@ -19,7 +19,7 @@ test("action node includes 24-hour plan in prompt", async () => {
   const ollama: OllamaAdapter = {
     generate: async (prompt: string) => {
       prompts.push(prompt);
-      return JSON.stringify({ action: "nudge_break", reason: "aligned with plan" });
+      return JSON.stringify({ actions: ["nudge_break", "nudge_sleep"], reason: "aligned with plan" });
     },
     generateWithImage: async () => "",
   };
@@ -45,7 +45,8 @@ test("action node includes 24-hour plan in prompt", async () => {
     },
   });
 
-  expect(result.decision?.action).toBe("nudge_break");
+  expect(result.decision?.actions).toEqual(["nudge_break", "nudge_sleep"]);
   expect(prompts[0]).toContain("24-hour plan:");
   expect(prompts[0]).toContain("10:30: nudge_break (reset focus)");
+  expect(prompts[0]).toContain('"actions": array of unique actions');
 });

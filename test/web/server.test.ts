@@ -6,7 +6,7 @@ const sampleEntries = [
   {
     eventId: "1",
     timestamp: "2026-03-29T09:00:00.000Z",
-    decision: { action: "none", reason: "routine" },
+    decision: { actions: ["none"], reason: "routine" },
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
     message: null,
     errors: [],
@@ -14,7 +14,7 @@ const sampleEntries = [
   {
     eventId: "2",
     timestamp: "2026-03-29T10:00:00.000Z",
-    decision: { action: "nudge_break", reason: "long session" },
+    decision: { actions: ["nudge_break", "nudge_sleep"], reason: "long session" },
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.85 },
     message: { body: "Stand up — long session." },
     errors: [],

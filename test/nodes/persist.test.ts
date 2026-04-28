@@ -68,7 +68,7 @@ const baseState = {
     reasons: [],
   },
   decision: {
-    action: "none" as const,
+    actions: ["none"] as const,
     reason: "routine",
   },
   message: null,
@@ -134,7 +134,7 @@ describe("persist node", () => {
 
     const state = {
       ...baseState,
-      decision: { action: "nudge_break" as const, reason: "long session" },
+      decision: { actions: ["nudge_break"] as const, reason: "long session" },
       message: { body: "Stand up and stretch — you've been sitting a while." },
     };
     await node(state);
@@ -156,13 +156,32 @@ describe("persist node", () => {
     expect(discord.messages.length).toBe(0);
   });
 
+  test("sends one Discord message when multiple actions include an active action", async () => {
+    const mixedConfig = mockActionsConfig({
+      observe_only: { active: false, description: "Passive observation only" },
+    });
+    const fs = mockFs();
+    const discord = mockDiscord();
+    const node = createPersistNode({ fs, config: { logDir: "./logs" }, actionsConfig: mixedConfig, discord });
+
+    await node({
+      ...baseState,
+      decision: { actions: ["observe_only", "nudge_break"], reason: "active included" },
+      message: { body: "Combined nudge." },
+    });
+
+    expect(discord.messages.length).toBe(1);
+    const entry = fs.written[0] as Record<string, unknown>;
+    expect(entry.discordMessageId).toBe("discord-msg-1");
+  });
+
   test("does not send to Discord when adapter not provided", async () => {
     const fs = mockFs();
     const node = createPersistNode({ fs, config: { logDir: "./logs" }, actionsConfig });
 
     const state = {
       ...baseState,
-      decision: { action: "nudge_break" as const, reason: "long session" },
+      decision: { actions: ["nudge_break"] as const, reason: "long session" },
       message: { body: "Stretch." },
     };
     await node(state);
@@ -231,7 +250,7 @@ describe("persist node", () => {
 
     const state = {
       ...baseState,
-      decision: { action: "nudge_break" as const, reason: "long session" },
+      decision: { actions: ["nudge_break"] as const, reason: "long session" },
       message: { body: "Stand up and stretch." },
     };
     await node(state);
@@ -259,7 +278,7 @@ describe("persist node", () => {
 
     const state = {
       ...baseState,
-      decision: { action: "nudge_break" as const, reason: "long session" },
+      decision: { actions: ["nudge_break"] as const, reason: "long session" },
       message: { body: "Stand up and take a walk." },
     };
 

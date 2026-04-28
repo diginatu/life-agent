@@ -23,7 +23,7 @@ const validSummaryJson = JSON.stringify({
 });
 
 const validActionJson = JSON.stringify({
-  action: "nudge_break",
+  actions: ["nudge_break"],
   reason: "user has been sitting for a while",
 });
 
@@ -100,7 +100,7 @@ describe("buildGraph (full pipeline)", () => {
     expect(result.capture).toBeDefined();
     expect(result.summary).toBeDefined();
     expect(result.decision).toBeDefined();
-    expect(result.decision!.action).toBe("nudge_break");
+    expect(result.decision!.actions).toEqual(["nudge_break"]);
     expect(result.message).toBeDefined();
     expect(result.message!.body).toContain("break");
     expect(result.errors).toEqual([]);
@@ -112,7 +112,7 @@ describe("buildGraph (full pipeline)", () => {
 
     expect(result.capture).toBeUndefined();
     expect(result.summary).toBeUndefined();
-    expect(result.decision!.action).toBe("none");
+    expect(result.decision!.actions).toEqual(["none"]);
     expect(result.message).toBeNull();
     expect(result.errors.length).toBeGreaterThan(0);
   });
@@ -123,7 +123,7 @@ describe("buildGraph (full pipeline)", () => {
 
     expect(result.capture).toBeDefined();
     expect(result.summary).toBeUndefined();
-    expect(result.decision!.action).toBe("none");
+    expect(result.decision!.actions).toEqual(["none"]);
     expect(result.message).toBeNull();
     expect(result.errors.some((e: string) => e.includes("ollama"))).toBe(true);
   });
@@ -163,7 +163,7 @@ describe("buildGraph (full pipeline)", () => {
 
   test("none action: no message drafted, no notification", async () => {
     const noneAction = JSON.stringify({
-      action: "none",
+      actions: ["none"],
       reason: "routine check",
     });
     const graph = await buildGraph(config, allMocks({
@@ -171,7 +171,21 @@ describe("buildGraph (full pipeline)", () => {
     }));
     const result = await graph.invoke({});
 
-    expect(result.decision!.action).toBe("none");
+    expect(result.decision!.actions).toEqual(["none"]);
     expect(result.message).toBeNull();
+  });
+
+  test("multi-action: pipeline carries all selected actions", async () => {
+    const multiAction = JSON.stringify({
+      actions: ["nudge_break", "nudge_sleep"],
+      reason: "long coding session late at night",
+    });
+    const graph = await buildGraph(config, allMocks({
+      ollamaGenerateResponses: [validPlanJson, multiAction, validMessageJson],
+    }));
+    const result = await graph.invoke({});
+
+    expect(result.decision!.actions).toEqual(["nudge_break", "nudge_sleep"]);
+    expect(result.message).toBeDefined();
   });
 });

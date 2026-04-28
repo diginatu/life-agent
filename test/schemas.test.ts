@@ -99,10 +99,27 @@ describe("SceneSummarySchema", () => {
 describe("ActionSelectionSchema", () => {
   test("accepts valid action selection", () => {
     const result = ActionSelectionSchema.parse({
-      action: "nudge_break",
+      actions: ["nudge_break"],
       reason: "user sitting for 2 hours",
     });
-    expect(result.action).toBe("nudge_break");
+    expect(result.actions).toEqual(["nudge_break"]);
+  });
+
+  test("accepts multiple actions", () => {
+    const result = ActionSelectionSchema.parse({
+      actions: ["nudge_break", "nudge_sleep"],
+      reason: "multiple nudges needed",
+    });
+    expect(result.actions).toEqual(["nudge_break", "nudge_sleep"]);
+  });
+
+  test("rejects none combined with other actions", () => {
+    expect(() =>
+      ActionSelectionSchema.parse({
+        actions: ["none", "nudge_break"],
+        reason: "invalid",
+      }),
+    ).toThrow();
   });
 
   // priority field removed from ActionSelectionSchema
@@ -144,7 +161,7 @@ describe("LogEntrySchema", () => {
     },
     policy: null,
     decision: {
-      action: "none" as const,
+      actions: ["none"] as const,
       reason: "routine logging",
     },
     message: null,
@@ -161,7 +178,7 @@ describe("LogEntrySchema", () => {
   test("accepts log entry with message", () => {
     const withMessage = {
       ...validEntry,
-      decision: { action: "nudge_break" as const, reason: "long session" },
+      decision: { actions: ["nudge_break"] as const, reason: "long session" },
       message: { body: "Take a walk — you've been at it a while" },
     };
     const result = LogEntrySchema.parse(withMessage);

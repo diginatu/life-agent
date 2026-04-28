@@ -38,7 +38,7 @@ test("message node includes 24-hour plan in prompt", async () => {
       activityGuess: "coding",
       confidence: 0.8,
     },
-    decision: { action: "nudge_break", reason: "aligned with plan" },
+    decision: { actions: ["nudge_break", "nudge_sleep"], reason: "aligned with plan" },
     plan: {
       generatedAt: "2026-04-24T10:00:00.000Z",
       validUntil: "2026-04-25T10:00:00.000Z",
@@ -49,4 +49,5 @@ test("message node includes 24-hour plan in prompt", async () => {
   expect(result.message?.body).toBe("Take a short break now.");
   expect(prompts[0]).toContain("24-hour plan:");
   expect(prompts[0]).toContain("10:30: nudge_break (reset focus)");
+  expect(prompts[0]).toContain("Actions: nudge_break, nudge_sleep");
 });

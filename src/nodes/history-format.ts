@@ -6,7 +6,7 @@ export type UserFeedbackEntry = z.infer<typeof UserFeedbackSchema>[number];
 export interface LogEntry {
   timestamp?: string;
   summary?: { activityGuess?: string | null; posture?: string; [key: string]: unknown };
-  decision?: { action?: string; reason?: string; [key: string]: unknown };
+  decision?: { actions?: string[]; action?: string; reason?: string; [key: string]: unknown };
   message?: { body?: string } | null;
   feedbackFromPrevious?: { text: string; userId: string; timestamp: string }[];
   tags?: string[];
@@ -44,7 +44,12 @@ export function formatHistory(entries: LogEntry[], now?: Date): { history: strin
     const relativeSuffix = now && parsed ? ` (${formatRelative(parsed, now)})` : "";
     const activity = e.summary?.activityGuess ?? "unknown";
     const posture = e.summary?.posture ?? "unknown";
-    const action = e.decision?.action ?? "unknown";
+    const actions = Array.isArray(e.decision?.actions)
+      ? e.decision.actions
+      : e.decision?.action
+        ? [e.decision.action]
+        : [];
+    const action = actions.length > 0 ? actions.join(",") : "unknown";
     const reason = e.decision?.reason ?? "";
     let line = `  ${time}${relativeSuffix} | ${posture}, ${activity} → ${action}${reason ? ` (${reason})` : ""}`;
     if (e.feedbackFromPrevious && e.feedbackFromPrevious.length > 0) {

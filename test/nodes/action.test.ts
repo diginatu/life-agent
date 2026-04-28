@@ -42,8 +42,13 @@ function errorFs(): FilesystemAdapter {
 }
 
 const validActionJson = JSON.stringify({
-  action: "nudge_break",
+  actions: ["nudge_break"],
   reason: "user has been sitting for a while",
+});
+
+const validMultiActionJson = JSON.stringify({
+  actions: ["nudge_break", "nudge_sleep"],
+  reason: "user has been at desk late for many hours",
 });
 
 function mockOllama(response = validActionJson): OllamaAdapter {
@@ -81,8 +86,29 @@ describe("action node", () => {
     const result = await node(makeState());
 
     expect(result.decision).toBeDefined();
-    expect(result.decision!.action).toBe("nudge_break");
     expect(result.decision!.reason).toBe("user has been sitting for a while");
+    expect(result.decision!.actions).toEqual(["nudge_break"]);
+  });
+
+  test("supports selecting multiple actions in one cycle", async () => {
+    const node = createActionNode({ ollama: mockOllama(validMultiActionJson), actionsConfig });
+    const result = await node(makeState());
+
+    expect(result.decision).toBeDefined();
+    expect(result.decision!.actions).toEqual(["nudge_break", "nudge_sleep"]);
+  });
+
+  test("rejects none mixed with other actions", async () => {
+    const node = createActionNode({
+      ollama: mockOllama(
+        JSON.stringify({ actions: ["none", "nudge_break"], reason: "bad combo" }),
+      ),
+      actionsConfig,
+    });
+    const result = await node(makeState());
+
+    expect(result.decision!.actions).toEqual(["none"]);
+    expect(result.errors?.[0]).toContain("schema validation failed");
   });
 
   test("output matches ActionSelectionSchema", async () => {
@@ -96,7 +122,7 @@ describe("action node", () => {
     const node = createActionNode({ ollama: errorOllama(), actionsConfig });
     const result = await node(makeState());
 
-    expect(result.decision!.action).toBe("none");
+    expect(result.decision!.actions).toEqual(["none"]);
     expect(result.errors!.length).toBeGreaterThan(0);
     expect(result.errors![0]).toContain("ollama");
   });
@@ -105,7 +131,7 @@ describe("action node", () => {
     const node = createActionNode({ ollama: mockOllama("not json at all"), actionsConfig });
     const result = await node(makeState());
 
-    expect(result.decision!.action).toBe("none");
+    expect(result.decision!.actions).toEqual(["none"]);
     expect(result.errors!.length).toBeGreaterThan(0);
   });
 
@@ -117,7 +143,7 @@ describe("action node", () => {
     const node = createActionNode({ ollama: mockOllama(invalidSchema), actionsConfig });
     const result = await node(makeState());
 
-    expect(result.decision!.action).toBe("none");
+    expect(result.decision!.actions).toEqual(["none"]);
     expect(result.errors!.length).toBeGreaterThan(0);
   });
 
@@ -126,14 +152,14 @@ describe("action node", () => {
     const node = createActionNode({ ollama: mockOllama(wrapped), actionsConfig });
     const result = await node(makeState());
 
-    expect(result.decision!.action).toBe("nudge_break");
+    expect(result.decision!.actions).toEqual(["nudge_break"]);
   });
 
   test("returns none-only with error when no summary", async () => {
     const node = createActionNode({ ollama: mockOllama(), actionsConfig });
     const result = await node({});
 
-    expect(result.decision!.action).toBe("none");
+    expect(result.decision!.actions).toEqual(["none"]);
     expect(result.errors!.length).toBeGreaterThan(0);
   });
 
@@ -219,12 +245,12 @@ describe("action node", () => {
   {
     timestamp: "2026-03-31T09:00:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
-    decision: { action: "none", reason: "routine" },
+    decision: { actions: ["none"], reason: "routine" },
   },
   {
     timestamp: "2026-03-31T10:00:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.85 },
-    decision: { action: "nudge_break", reason: "long session" },
+    decision: { actions: ["nudge_break"], reason: "long session" },
   },
 ];
 
@@ -264,7 +290,7 @@ describe("action node with history", () => {
     const result = await node(makeState());
 
     expect(result.decision).toBeDefined();
-    expect(result.decision!.action).toBe("nudge_break");
+    expect(result.decision!.actions).toEqual(["nudge_break"]);
     expect(result.errors).toBeUndefined();
   });
 
@@ -278,7 +304,7 @@ describe("action node with history", () => {
     const result = await node(makeState());
 
     expect(result.decision).toBeDefined();
-    expect(result.decision!.action).toBe("nudge_break");
+    expect(result.decision!.actions).toEqual(["nudge_break"]);
     expect(result.errors).toBeUndefined();
   });
 
@@ -322,7 +348,7 @@ describe("action node with history", () => {
     const entriesWithMessage = [
       {
         ...historyEntries[0],
-        decision: { action: "nudge_break", reason: "long session" },
+        decision: { actions: ["nudge_break"], reason: "long session" },
         message: { body: "Time for a stretch! You've been coding for a while." },
       },
       historyEntries[1],
@@ -505,7 +531,7 @@ describe("action node with history", () => {
     const result = await node(makeState());
 
     expect(result.decision).toBeDefined();
-    expect(result.decision!.action).toBe("nudge_break");
+    expect(result.decision!.actions).toEqual(["nudge_break"]);
   });
 });
 
@@ -517,12 +543,12 @@ const l1Entries = [
   {
     timestamp: "2026-04-14T08:05:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "coding", confidence: 0.9 },
-    decision: { action: "none", reason: "l1 entry one" },
+    decision: { actions: ["none"], reason: "l1 entry one" },
   },
   {
     timestamp: "2026-04-14T08:30:00.000Z",
     summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "reading", confidence: 0.8 },
-    decision: { action: "nudge_break", reason: "l1 entry two" },
+    decision: { actions: ["nudge_break"], reason: "l1 entry two" },
   },
 ];
 
@@ -640,7 +666,7 @@ describe("action node with L2/L3 memory layers", () => {
       readAllLinesForDay: async () => [],
       readEntriesSince: async (_dir, since) => {
         capturedSince = since;
-        return [{ timestamp: "2026-04-14T09:00:00.000Z", summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "l1 no l2", confidence: 0.7 }, decision: { action: "none", reason: "no l2 entry" } }];
+        return [{ timestamp: "2026-04-14T09:00:00.000Z", summary: { personPresent: true, posture: "sitting", scene: "desk", activityGuess: "l1 no l2", confidence: 0.7 }, decision: { actions: ["none"], reason: "no l2 entry" } }];
       },
       pruneEntriesBefore: async () => {},
     };

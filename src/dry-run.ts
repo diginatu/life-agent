@@ -13,7 +13,7 @@ const summaryJson = JSON.stringify({
 });
 
 const actionJson = JSON.stringify({
-  action: "nudge_break",
+  actions: ["nudge_break"],
   reason: "user has been sitting at desk for a while",
 });
 
