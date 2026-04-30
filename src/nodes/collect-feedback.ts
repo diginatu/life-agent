@@ -37,6 +37,11 @@ export function createCollectFeedbackNode(deps: CollectFeedbackDeps) {
         actionsConfig.settings.discordMentionUserId || undefined,
       );
 
+      // The Discord fetch often returns messages newest-first. Reverse the
+      // array so that replies are in chronological order (oldest -> newest)
+      // and the latest message is last.
+      if (replies.length > 1) replies.reverse();
+
       if (replies.length === 0) return {};
 
       console.log(`[User Feedback]\n${replies.length} replies collected`);
