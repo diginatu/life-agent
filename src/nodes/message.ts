@@ -101,6 +101,8 @@ export function createMessageNode(deps: MessageNodeDeps) {
       return { message: null };
     }
 
+    const promptActions = selectedActions.filter((action) => action !== "replan-next");
+
     if (!state.summary) {
       return {
         message: getFallback(selectedActions),
@@ -108,7 +110,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
       };
     }
 
-    const actionDescriptions = selectedActions
+    const actionDescriptions = promptActions
       .map((action) => {
         const description = actionsConfig.getDescription(action);
         return description ? `  - ${action}: ${description}` : `  - ${action}`;
@@ -128,7 +130,7 @@ export function createMessageNode(deps: MessageNodeDeps) {
 
     const prompt = buildPrompt(
       state.summary,
-      state.decision,
+      { ...state.decision, actions: promptActions },
       actionsConfig.settings.responseStyle,
       formatPlanContext(state.plan),
       formatMemoryContext(memory, currentTime),

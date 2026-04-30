@@ -12,6 +12,12 @@ Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore fo
 
 - **Adapter DI**: External services (Ollama, filesystem, ffmpeg, Discord) injected as interfaces. `--dry-run` uses mocks.
 - **Config**: Zod-validated YAML (`config.yml` + `config.local.yml` override). Actions are data-driven.
+- **Actions**:
+  - Actions are defined in `config.yml` under `actions:` with `active`, optional `description`, and required `fallback.body` for active actions.
+  - `active: true` actions can generate Discord notifications via Message/Persist; `active: false` actions are control/passive signals and are logged only.
+  - `none` must always exist and cannot be combined with other actions.
+  - `replan-next` is a passive control action: when selected in one run, the next run's Plan node ignores fresh cache and regenerates the 24-hour plan.
+  - Plan generation excludes `replan-next` from schedulable plan items, and Message excludes it from user-facing action text.
 - **Discord reply loop**: `CollectFeedback` node reads the last log entry's Discord cursor (`discordMessageId` or `discordLastSeenMessageId`), fetches replies via `discord.collectReplies`, and puts them on `state.userFeedback`. The `Action` node injects those replies into the LLM prompt in the same run (no multi-run delay). `Persist` writes them back to the log entry as `feedbackFromPrevious` for audit / history.
 - **4-layer time-windowed memory**:
   - **L1** — raw JSONL log entries in `logs/`. Read from latest L2 `windowEnd` to now. `LayerUpdate` prunes raw entries older than the first not-yet-eligible L3 bucket start, so L1 stays a hot working set instead of growing forever.

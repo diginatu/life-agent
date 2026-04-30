@@ -82,6 +82,9 @@ ${actionDescriptions}
 ${!userFeedback || userFeedback.length === 0 ? '\nIMPORTANT: There are no new user messages in this cycle. Do NOT just "reply"' : '\nIMPORTANT: The user has sent a new message this cycle.'}
 ${userFeedback && userFeedback.length > 0 ? '\nIMPORTANT: When there is a new user message, do not choose "none" unless truly unavoidable.' : ""}
 IMPORTANT: If the 24-hour plan conflicts with the current scene or latest user feedback, prioritize current scene and latest user feedback.
+Use "replan-next" only when the current scene or latest user feedback materially changes the next-day plan.
+"replan-next" is an internal control action and may be combined with an active nudge action when both are needed.
+Do not choose "replan-next" routinely.
 You MUST choose one or more actions from the available actions list above. Return a JSON object with exactly these fields:
 {
   "reason": string explaining your choice

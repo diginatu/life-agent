@@ -12,6 +12,9 @@ actions:
     description: Suggest a short break
     fallback:
       body: Take a short break.
+  replan-next:
+    active: false
+    description: Refresh the 24-hour plan on next cycle when context changed.
 `);
 
 test("action node includes 24-hour plan in prompt", async () => {
@@ -49,4 +52,5 @@ test("action node includes 24-hour plan in prompt", async () => {
   expect(prompts[0]).toContain("24-hour plan:");
   expect(prompts[0]).toContain("10:30: nudge_break (reset focus)");
   expect(prompts[0]).toContain('"actions": array of unique actions');
+  expect(prompts[0]).toContain("Use \"replan-next\" only when the current scene or latest user feedback materially changes the next-day plan.");
 });

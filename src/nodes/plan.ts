@@ -33,6 +33,10 @@ interface PlanNodeResult {
   errors?: string[];
 }
 
+interface ReplanRequest {
+  reason?: string;
+}
+
 const PlanDraftSchema = z.object({
   items: PlanSchema.shape.items,
 });
@@ -56,10 +60,11 @@ function buildPrompt(
   currentTime: Date,
   previousPlan: Plan | undefined,
   memorySection: string,
+  replanRequest: ReplanRequest | undefined,
   userFeedback?: UserFeedbackEntry[],
 ): string {
-  const allActions = actionsConfig.getActionNames();
-  const actionDescriptions = allActions
+  const schedulableActions = actionsConfig.getActionNames().filter((a) => a !== "replan-next");
+  const actionDescriptions = schedulableActions
     .map((a) => {
       const desc = actionsConfig.getDescription(a);
       return desc ? `  - ${a}: ${desc}` : `  - ${a}`;
@@ -70,6 +75,12 @@ function buildPrompt(
     formatUserFeedback(userFeedback, currentTime)
     + formatPlanContext(previousPlan)
     + memorySection;
+
+  const replanSection = replanRequest
+    ? `\nIMPORTANT: The previous cycle selected "replan-next".
+Treat the cached plan as stale and replace it with a refreshed plan for the next 24 hours.
+${replanRequest.reason ? `Replan reason from previous cycle: ${replanRequest.reason}\n` : ""}`
+    : "";
 
   return `You are a personal assistant. Create a practical plan for the next 24 hours.
 The plan should describe likely timings and actions the assistant will take over the next day.
@@ -87,19 +98,44 @@ Rules:
 - Use only actions from the available actions list.
 - Include concrete, time-oriented items for the next 24 hours.
 - Keep the plan concise and actionable.
+${replanSection}
 
 Return a JSON object with exactly these fields:
 {
   "items": [
     {
       "time": string,
-      "action": one of ${JSON.stringify(allActions)},
+      "action": one of ${JSON.stringify(schedulableActions)},
       "reason": string
     }
   ]
 }
 
 Return ONLY the JSON object, no other text.`;
+}
+
+async function readReplanRequest(
+  fs: FilesystemAdapter | undefined,
+  logDir: string | undefined,
+  now: Date,
+): Promise<ReplanRequest | undefined> {
+  if (!fs || !logDir) return undefined;
+
+  const dateStr = now.toISOString().slice(0, 10);
+  const lastEntries = await fs.readLastNLinesAcrossDays(logDir, dateStr, 1);
+  if (lastEntries.length === 0) return undefined;
+
+  const lastEntry = lastEntries[lastEntries.length - 1] as {
+    decision?: { actions?: unknown; reason?: unknown };
+  };
+  const actions = lastEntry.decision?.actions;
+  if (!Array.isArray(actions) || !actions.includes("replan-next")) {
+    return undefined;
+  }
+
+  return {
+    reason: typeof lastEntry.decision?.reason === "string" ? lastEntry.decision.reason : undefined,
+  };
 }
 
 export function createPlanNode(deps: PlanNodeDeps) {
@@ -112,8 +148,9 @@ export function createPlanNode(deps: PlanNodeDeps) {
       : null;
     const parsedStored = PlanSchema.safeParse(stored?.value);
     const cachedPlan = parsedStored.success ? parsedStored.data : undefined;
+    const replanRequest = await readReplanRequest(deps.fs, deps.logDir, currentTime);
 
-    if (cachedPlan && isPlanFresh(cachedPlan, currentTime)) {
+    if (cachedPlan && isPlanFresh(cachedPlan, currentTime) && !replanRequest) {
       return { plan: cachedPlan };
     }
 
@@ -130,6 +167,7 @@ export function createPlanNode(deps: PlanNodeDeps) {
       currentTime,
       cachedPlan,
       formatMemoryContext(memory, currentTime),
+      replanRequest,
       state.userFeedback,
     );
 

@@ -80,3 +80,7 @@ actions:
     description: Suggest the user go to sleep when it's late
     fallback:
       body: Time to wind down — it's getting late. Consider wrapping up and heading to bed.
+
+  replan-next:
+    active: false
+    description: Internal control action to refresh the 24-hour plan on the next cycle when context changes.
