@@ -17,7 +17,7 @@ Graph is compiled with a `BaseStore` (FileStore for production, InMemoryStore fo
   - **L1** — raw JSONL log entries in `logs/`. Read from latest L2 `windowEnd` to now. `LayerUpdate` prunes raw entries older than the first not-yet-eligible L3 bucket start, so L1 stays a hot working set instead of growing forever.
   - **L2** — hourly LLM summary, delayed by `l2DelayHours` (default 1h) so recent logs stay in L1. Keyed by local-time hour `YYYY-MM-DDTHH`. Capped at `l2MaxRetention` entries (default 48 ≈ 2 days).
   - **L3** — 6-hour LLM summary of L2 entries, delayed by `l3DelayHours` (default 6h). Buckets aligned to 00/06/12/18 UTC. Capped at `l3MaxRetention` entries (default 28 ≈ 7 days).
-  - **L4** — single persistent-memory text (one entry at `["memory","L4"]` key `"current"`). On each L3 eviction, an LLM merges the current L4 text with the about-to-be-deleted L3 entry to produce a new concise distillation. Bounded by `l4MaxChars` (default 2000). Never auto-expires — only rewritten.
+  - **L4** — single persistent-memory text (one entry at `["memory","L4"]` key `"current"`). When L3 exceeds retention, entries older than `l4DelayHours` (default 24h) are batched and merged into L4 before deletion. Bounded by `l4MaxChars` (default 2000). Never auto-expires — only rewritten.
   All four layers are injected into the Action prompt (L4 → L3 → L2 → L1, no gap). `LayerUpdate` node runs each tick and catches up missed windows after sleep.
   Stored in `{memoryDir}/store.json` under namespaces `["memory","L2"]`, `["memory","L3"]`, and `["memory","L4"]`.
 - **Sprint convention**: Commits follow `feat: <description> (Sprint N)`.

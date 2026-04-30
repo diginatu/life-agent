@@ -55,6 +55,9 @@ settings:
   # Maximum number of L3 6-hour entries to keep in store
   l3MaxRetention: 28
 
+  # Hours to delay L4 distillation after each L3 window ends
+  l4DelayHours: 24
+
   # L4 persistent memory: max char size of the distilled text
   l4MaxChars: 2000
 

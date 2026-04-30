@@ -100,7 +100,7 @@ The agent runs a 7-node LangGraph pipeline on each invocation:
 4. **Action** — LLM selects an action using L1/L2/L3/L4 memory layers and the latest user reply
 5. **Message** — LLM drafts a notification message (if needed)
 6. **Persist** — writes JSONL log + sends Discord notification
-7. **LayerUpdate** — rolls up L1 logs into hourly L2 summaries, L2 into 6-hour L3 summaries, prunes raw L1 logs once they are safely covered by L3, and distills evicted L3 entries into a single persistent L4 memory text (delayed, idempotent, catches up after sleep)
+7. **LayerUpdate** — rolls up L1 logs into hourly L2 summaries, L2 into 6-hour L3 summaries, prunes raw L1 logs once they are safely covered by L3, and distills delayed evicted L3 entries into a single persistent L4 memory text in batches (delayed, idempotent, catches up after sleep)
 
 Actions are data-driven via `config.yml`; see that file for the current set.
 

@@ -8,5 +8,5 @@ export const DEFAULT_L4_PROMPT = `Update the persistent memory with any new dura
 Current persistent memory:
 {l4Current}
 
-Expiring 6-hour summary ({l3WindowStart}..{l3WindowEnd}):
-{l3Content}`;
+Expiring 6-hour summaries:
+{l3Entries}`;

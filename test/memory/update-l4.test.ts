@@ -3,14 +3,22 @@ import { updateL4 } from "../../src/memory/update-l4.ts";
 import type { OllamaAdapter } from "../../src/adapters/ollama.ts";
 
 const PROMPT_TEMPLATE =
-  "L4={l4Current}|L3={l3Content}|WS={l3WindowStart}|WE={l3WindowEnd}|MAX={l4MaxChars}";
+  "L4={l4Current}|L3S={l3Entries}|MAX={l4MaxChars}";
 
-const EVICTED_L3 = {
-  content: "user worked on coding for 6 hours, took breaks",
-  windowStart: "2026-04-10T00:00:00.000Z",
-  windowEnd: "2026-04-10T06:00:00.000Z",
-  sourceCount: 5,
-};
+const EVICTED_L3 = [
+  {
+    content: "user worked on coding for 6 hours, took breaks",
+    windowStart: "2026-04-10T00:00:00.000Z",
+    windowEnd: "2026-04-10T06:00:00.000Z",
+    sourceCount: 5,
+  },
+  {
+    content: "user switched to reading and planning",
+    windowStart: "2026-04-10T06:00:00.000Z",
+    windowEnd: "2026-04-10T12:00:00.000Z",
+    sourceCount: 2,
+  },
+];
 
 function captureOllama(response: string): { ollama: OllamaAdapter; calls: string[] } {
   const calls: string[] = [];
@@ -25,13 +33,13 @@ function captureOllama(response: string): { ollama: OllamaAdapter; calls: string
 }
 
 describe("updateL4", () => {
-  test("fills prompt template with current L4, evicted L3 fields, and maxChars", async () => {
+  test("fills prompt template with current L4, evicted L3 entries, and maxChars", async () => {
     const { ollama, calls } = captureOllama("new memory");
     await updateL4(ollama, "prior text", EVICTED_L3, PROMPT_TEMPLATE, 500);
 
     expect(calls).toHaveLength(1);
     expect(calls[0]).toBe(
-      "L4=prior text|L3=user worked on coding for 6 hours, took breaks|WS=2026-04-10T00:00:00.000Z|WE=2026-04-10T06:00:00.000Z|MAX=500",
+      "L4=prior text|L3S=[2026-04-10T00:00:00.000Z..2026-04-10T06:00:00.000Z] user worked on coding for 6 hours, took breaks\n[2026-04-10T06:00:00.000Z..2026-04-10T12:00:00.000Z] user switched to reading and planning|MAX=500",
     );
   });
 

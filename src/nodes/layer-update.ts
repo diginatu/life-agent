@@ -20,6 +20,7 @@ export interface LayerUpdateNodeDeps {
   l3DelayHours: number;
   l2MaxRetention: number;
   l3MaxRetention: number;
+  l4DelayHours?: number;
   l4MaxChars?: number;
   l4UpdatePrompt?: string;
   maxScanDays?: number;
@@ -57,6 +58,7 @@ const L3_NAMESPACE = ["memory", "L3"] as const;
 const L3_BUCKET_MS = 6 * 3600000;
 const L3_BUCKET_HOURS = [0, 6, 12, 18];
 const DEFAULT_MAX_SCAN_DAYS = 14;
+const DEFAULT_L4_DELAY_HOURS = 24;
 
 export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
   return async (): Promise<Record<string, never>> => {
@@ -174,42 +176,51 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         sourceCount: l2Items.length,
       });
 
-      const allL3AfterWrite = await deps.store.search(L3_NAMESPACE as unknown as string[], {
-        limit: 10000,
+    }
+
+    // L3 retention + delayed L4 rollover.
+    const allL3Final = await deps.store.search(L3_NAMESPACE as unknown as string[], {
+      limit: 10000,
+    });
+    if (allL3Final.length > deps.l3MaxRetention) {
+      const sorted = [...allL3Final].sort((a, b) => {
+        const aWs = (a.value as { windowStart?: string }).windowStart ?? "";
+        const bWs = (b.value as { windowStart?: string }).windowStart ?? "";
+        return aWs < bWs ? -1 : aWs > bWs ? 1 : 0;
       });
-      if (allL3AfterWrite.length > deps.l3MaxRetention) {
-        const sorted = [...allL3AfterWrite].sort((a, b) => {
-          const aWs = (a.value as { windowStart?: string }).windowStart ?? "";
-          const bWs = (b.value as { windowStart?: string }).windowStart ?? "";
-          return aWs < bWs ? -1 : aWs > bWs ? 1 : 0;
-        });
-        const toEvict = sorted.slice(0, allL3AfterWrite.length - deps.l3MaxRetention);
+      const overflow = sorted.slice(0, allL3Final.length - deps.l3MaxRetention);
+      const l4DelayMs = (deps.l4DelayHours ?? DEFAULT_L4_DELAY_HOURS) * 3600000;
+      const l4Eligible = overflow.filter((item) => {
+        const we = (item.value as { windowEnd?: string }).windowEnd;
+        if (!we) return false;
+        const weMs = new Date(we).getTime();
+        if (Number.isNaN(weMs)) return false;
+        return weMs + l4DelayMs <= now.getTime();
+      });
 
+      if (l4Eligible.length > 0) {
         const existingL4 = await deps.store.get(L4_NAMESPACE as unknown as string[], L4_KEY);
-        let l4Content = (existingL4?.value as { content?: string } | null)?.content ?? "";
-        let l4SourceCount =
+        const l4Content = (existingL4?.value as { content?: string } | null)?.content ?? "";
+        const l4SourceCount =
           (existingL4?.value as { sourceCount?: number } | null)?.sourceCount ?? 0;
+        const evicted = l4Eligible.map((item) => item.value as EvictedL3Entry);
+        const newContent = await updateL4(
+          deps.ollama,
+          l4Content,
+          evicted,
+          deps.l4UpdatePrompt ?? DEFAULT_L4_PROMPT,
+          deps.l4MaxChars ?? DEFAULT_L4_MAX_CHARS,
+        );
 
-        for (const item of toEvict) {
-          const evicted = item.value as EvictedL3Entry;
-          const newContent = await updateL4(
-            deps.ollama,
-            l4Content,
-            evicted,
-            deps.l4UpdatePrompt ?? DEFAULT_L4_PROMPT,
-            deps.l4MaxChars ?? DEFAULT_L4_MAX_CHARS,
-          );
+        if (newContent !== l4Content) {
+          await deps.store.put(L4_NAMESPACE as unknown as string[], L4_KEY, {
+            content: newContent,
+            updatedAt: now.toISOString(),
+            sourceCount: l4SourceCount + evicted.length,
+          });
+        }
 
-          if (newContent !== l4Content) {
-            l4Content = newContent;
-            l4SourceCount += 1;
-            await deps.store.put(L4_NAMESPACE as unknown as string[], L4_KEY, {
-              content: l4Content,
-              updatedAt: now.toISOString(),
-              sourceCount: l4SourceCount,
-            });
-          }
-
+        for (const item of l4Eligible) {
           await deps.store.delete(L3_NAMESPACE as unknown as string[], item.key);
         }
       }

@@ -56,6 +56,23 @@ test("l3MaxRetention defaults to 28", () => {
   expect(config.settings.l3MaxRetention).toBe(28);
 });
 
+test("l4DelayHours defaults to 24", () => {
+  const config = loadConfig(minimalYaml);
+  expect(config.settings.l4DelayHours).toBe(24);
+});
+
+test("l4DelayHours is parsed from YAML", () => {
+  const yaml = `
+settings:
+  l4DelayHours: 12
+actions:
+  none:
+    active: false
+`;
+  const config = loadConfig(yaml);
+  expect(config.settings.l4DelayHours).toBe(12);
+});
+
 test("discordChannelId is parsed from YAML", () => {
   const yaml = `
 settings:
