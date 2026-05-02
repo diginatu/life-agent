@@ -414,6 +414,7 @@ describe("action node with history", () => {
     await node(makeState());
 
     expect(capturedPrompt).toContain("Thanks, I will stretch now");
+    expect(capturedPrompt).toMatch(/user reply \[[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}, 2 hours ago\]: Thanks, I will stretch now/);
   });
 
   test("includes latest user reply section from state.userFeedback in prompt", async () => {

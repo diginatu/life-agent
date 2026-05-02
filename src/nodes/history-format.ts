@@ -1,5 +1,6 @@
 import type { z } from "zod/v4";
 import type { UserFeedbackSchema } from "../state.ts";
+import { formatLocalDateTime, formatTimeOfDay } from "./format-time.ts";
 
 export type UserFeedbackEntry = z.infer<typeof UserFeedbackSchema>[number];
 
@@ -16,12 +17,25 @@ export interface LogEntry {
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "always" });
 
-function formatTimeOfDay(date: Date): string {
-  return date.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+function parseTimestamp(iso: string | undefined): Date | undefined {
+  if (!iso) return undefined;
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function formatFeedbackLine(
+  feedback: { text: string; timestamp: string },
+  now?: Date,
+): string {
+  const [firstLine, ...restLines] = feedback.text.split("\n");
+  const continuation = restLines.map((line) => `      ${line}`).join("\n");
+
+  const parsed = parseTimestamp(feedback.timestamp);
+  const header = parsed
+    ? `    user reply [${formatLocalDateTime(parsed)}${now ? `, ${formatRelative(parsed, now)}` : ""}]: ${firstLine ?? ""}`
+    : `    user reply: ${firstLine ?? ""}`;
+
+  return continuation ? `${header}\n${continuation}` : header;
 }
 
 export function formatRelative(past: Date, now: Date): string {
@@ -39,7 +53,7 @@ export function formatHistory(entries: LogEntry[], now?: Date): { history: strin
   const regularEntries = entries.filter((e) => !e.tags?.includes("digest"));
 
   const historyLines = regularEntries.map((e) => {
-    const parsed = e.timestamp ? new Date(e.timestamp) : null;
+    const parsed = parseTimestamp(e.timestamp);
     const time = parsed ? formatTimeOfDay(parsed) : "??:??";
     const relativeSuffix = now && parsed ? ` (${formatRelative(parsed, now)})` : "";
     const activity = e.summary?.activityGuess ?? "unknown";
@@ -53,8 +67,10 @@ export function formatHistory(entries: LogEntry[], now?: Date): { history: strin
     const reason = e.decision?.reason ?? "";
     let line = `  ${time}${relativeSuffix} | ${posture}, ${activity} → ${action}${reason ? ` (${reason})` : ""}`;
     if (e.feedbackFromPrevious && e.feedbackFromPrevious.length > 0) {
-      const replies = e.feedbackFromPrevious.map((f) => f.text).join("; ");
-      line += `\n    user reply: ${replies}`;
+      const replies = e.feedbackFromPrevious
+        .map((f) => formatFeedbackLine(f, now))
+        .join("\n");
+      line += `\n${replies}`;
     }
     if (e.message?.body) {
       line += `\n    agent message: ${e.message.body}`;
@@ -70,8 +86,8 @@ export function formatHistory(entries: LogEntry[], now?: Date): { history: strin
 export function formatUserFeedback(feedback: UserFeedbackEntry[] | undefined, now: Date): string {
   if (!feedback || feedback.length === 0) return "";
   const lines = feedback.map((f) => {
-    if (!f.timestamp) return `  - [??:??] ${f.text}`;
-    const parsed = new Date(f.timestamp);
+    const parsed = parseTimestamp(f.timestamp);
+    if (!parsed) return `  - [??:??] ${f.text}`;
     return `  - [${formatTimeOfDay(parsed)}, ${formatRelative(parsed, now)}] ${f.text}`;
   });
   return `\nLatest user reply (since last nudge):\n${lines.join("\n")}\n`;

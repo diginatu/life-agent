@@ -1,13 +1,26 @@
-export function formatTime(date: Date): string {
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const dayOfWeek = days[date.getDay()];
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const hours24 = date.getHours();
-  const period = hours24 >= 12 ? "PM" : "AM";
-  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
-  const hh = String(hours12).padStart(2, "0");
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+export function formatTimeOfDay(date: Date): string {
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+export function formatLocalDateTime(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
   const min = String(date.getMinutes()).padStart(2, "0");
-  return `${dayOfWeek}, ${yyyy}-${mm}-${dd} ${hh}:${min} ${period}`;
+  const s = String(date.getSeconds()).padStart(2, "0");
+  return `${y}-${m}-${day}T${h}:${min}:${s}`;
+}
+
+export function formatTime(date: Date): string {
+  const dayOfWeek = DAYS[date.getDay()];
+  const localDate = formatLocalDateTime(date).slice(0, 10);
+  const timeOfDay = formatTimeOfDay(date);
+  return `${dayOfWeek}, ${localDate} ${timeOfDay}`;
 }

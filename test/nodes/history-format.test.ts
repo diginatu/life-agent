@@ -6,6 +6,7 @@ import {
   type LogEntry,
   type UserFeedbackEntry,
 } from "../../src/nodes/history-format.ts";
+import { formatLocalDateTime } from "../../src/nodes/format-time.ts";
 
 const NOW = new Date("2026-04-18T14:30:00Z");
 
@@ -91,5 +92,19 @@ describe("formatHistory", () => {
     expect(history).not.toContain("ago)");
     expect(history).not.toContain("just now");
     expect(history).toContain("sitting, coding");
+  });
+
+  test("includes local datetime and relative age for user replies in recent history", () => {
+    const replyTs = "2026-04-18T14:20:00.000Z";
+    const { history } = formatHistory(
+      [{
+        ...entries[0],
+        feedbackFromPrevious: [{ text: "line1\nline2", userId: "u1", timestamp: replyTs }],
+      }],
+      NOW,
+    );
+
+    expect(history).toContain(`user reply [${formatLocalDateTime(new Date(replyTs))}, 10 minutes ago]: line1`);
+    expect(history).toContain("      line2");
   });
 });
