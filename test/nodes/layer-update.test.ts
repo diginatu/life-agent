@@ -835,3 +835,73 @@ describe("createLayerUpdateNode — L2 hourly rollup", () => {
     expect(keys).toContain(localHourKey(HOUR_MINUS1));
   });
 });
+
+describe("createLayerUpdateNode — per-layer Ollama adapters", () => {
+  let store: InMemoryStore;
+  beforeEach(() => { store = new InMemoryStore(); });
+
+  test("uses dedicated adapters for L2, L3, and L4 summarization", async () => {
+    const l2Calls: string[] = [];
+    const l3Calls: string[] = [];
+    const l4Calls: string[] = [];
+
+    const l2Ollama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        l2Calls.push(prompt);
+        return "l2 summary";
+      },
+      generateWithImage: async () => "",
+    };
+    const l3Ollama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        l3Calls.push(prompt);
+        return "l3 summary";
+      },
+      generateWithImage: async () => "",
+    };
+    const l4Ollama: OllamaAdapter = {
+      generate: async (prompt: string) => {
+        l4Calls.push(prompt);
+        return "l4 summary";
+      },
+      generateWithImage: async () => "",
+    };
+
+    await seedL2(store, l2EntriesForBucket);
+    await store.put(["memory", "L3"], "2026-04-12T00", {
+      content: "old summary A",
+      windowStart: "2026-04-12T00:00:00.000Z",
+      windowEnd: "2026-04-12T06:00:00.000Z",
+      sourceCount: 1,
+    });
+    await store.put(["memory", "L3"], "2026-04-12T06", {
+      content: "old summary B",
+      windowStart: "2026-04-12T06:00:00.000Z",
+      windowEnd: "2026-04-12T12:00:00.000Z",
+      sourceCount: 1,
+    });
+
+    const node = createLayerUpdateNode({
+      ollama: mockOllama("fallback summary"),
+      l2Ollama,
+      l3Ollama,
+      l4Ollama,
+      fs: mockFs({ "2026-04-15": entriesInH }),
+      logDir: "./logs",
+      store,
+      l2DelayHours: 1,
+      l3DelayHours: 6,
+      l2MaxRetention: 9999,
+      l3MaxRetention: 1,
+      l4MaxChars: 2000,
+      l4UpdatePrompt: "L4_PROMPT cur={l4Current} evict={l3Entries}",
+      now: () => TICK_L3_ELIGIBLE,
+    });
+    await node();
+
+    expect(l2Calls.length).toBeGreaterThan(0);
+    expect(l3Calls.length).toBeGreaterThan(0);
+    expect(l4Calls.length).toBe(1);
+    expect(l4Calls[0]).toContain("L4_PROMPT");
+  });
+});

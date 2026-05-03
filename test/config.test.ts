@@ -7,6 +7,12 @@ settings:
   ollamaModel: llama3:8b
   ollamaBaseUrl: http://localhost:11434
   ollamaThink: true
+  l2OllamaModel: gemma3:4b
+  l2OllamaThink: false
+  l3OllamaModel: qwen3:8b
+  l3OllamaThink: true
+  l4OllamaModel: mistral:latest
+  l4OllamaThink: true
   logDir: ./my-logs
   captureDir: ./my-captures
   captureWidth: 1280
@@ -56,6 +62,12 @@ describe("loadConfig", () => {
       expect(config.settings.webcamDevice).toBe("/dev/video2");
       expect(config.settings.ollamaModel).toBe("llama3:8b");
       expect(config.settings.ollamaThink).toBe(true);
+      expect(config.settings.l2OllamaModel).toBe("gemma3:4b");
+      expect(config.settings.l2OllamaThink).toBe(false);
+      expect(config.settings.l3OllamaModel).toBe("qwen3:8b");
+      expect(config.settings.l3OllamaThink).toBe(true);
+      expect(config.settings.l4OllamaModel).toBe("mistral:latest");
+      expect(config.settings.l4OllamaThink).toBe(true);
       expect(config.settings.logDir).toBe("./my-logs");
       expect(config.settings.captureWidth).toBe(1280);
     });
@@ -65,6 +77,12 @@ describe("loadConfig", () => {
       expect(config.settings.webcamDevice).toBe("/dev/video0");
       expect(config.settings.ollamaModel).toBe("gemma3:12b");
       expect(config.settings.ollamaThink).toBe(false);
+      expect(config.settings.l2OllamaModel).toBeUndefined();
+      expect(config.settings.l2OllamaThink).toBeUndefined();
+      expect(config.settings.l3OllamaModel).toBeUndefined();
+      expect(config.settings.l3OllamaThink).toBeUndefined();
+      expect(config.settings.l4OllamaModel).toBeUndefined();
+      expect(config.settings.l4OllamaThink).toBeUndefined();
       expect(config.settings.logDir).toBe("./logs");
       expect(config.settings.captureDir).toBe("./captures");
       expect(config.settings.captureWidth).toBe(640);

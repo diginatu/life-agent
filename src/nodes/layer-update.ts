@@ -13,6 +13,9 @@ import type { LogEntry } from "./history-format.ts";
 
 export interface LayerUpdateNodeDeps {
   ollama: OllamaAdapter;
+  l2Ollama?: OllamaAdapter;
+  l3Ollama?: OllamaAdapter;
+  l4Ollama?: OllamaAdapter;
   fs: FilesystemAdapter;
   logDir: string;
   store: BaseStore;
@@ -62,6 +65,9 @@ const DEFAULT_L4_DELAY_HOURS = 24;
 
 export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
   return async (): Promise<Record<string, never>> => {
+    const l2Ollama = deps.l2Ollama ?? deps.ollama;
+    const l3Ollama = deps.l3Ollama ?? deps.ollama;
+    const l4Ollama = deps.l4Ollama ?? deps.ollama;
     const now = (deps.now ?? (() => new Date()))();
     const maxScanDays = deps.maxScanDays ?? DEFAULT_MAX_SCAN_DAYS;
 
@@ -113,7 +119,7 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         continue;
       }
 
-      const content = await summarizeLayer(deps.ollama, entries, key);
+      const content = await summarizeLayer(l2Ollama, entries, key);
 
       await deps.store.put(L2_NAMESPACE as unknown as string[], key, {
         content,
@@ -167,7 +173,7 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         continue;
       }
 
-      const content = await summarizeL3(deps.ollama, l2Items, bucketKey);
+      const content = await summarizeL3(l3Ollama, l2Items, bucketKey);
 
       await deps.store.put(L3_NAMESPACE as unknown as string[], bucketKey, {
         content,
@@ -204,10 +210,10 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         const l4SourceCount =
           (existingL4?.value as { sourceCount?: number } | null)?.sourceCount ?? 0;
         const evicted = l4Eligible.map((item) => item.value as EvictedL3Entry);
-        const newContent = await updateL4(
-          deps.ollama,
-          l4Content,
-          evicted,
+          const newContent = await updateL4(
+            l4Ollama,
+            l4Content,
+            evicted,
           deps.l4UpdatePrompt ?? DEFAULT_L4_PROMPT,
           deps.l4MaxChars ?? DEFAULT_L4_MAX_CHARS,
         );

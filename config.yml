@@ -18,6 +18,21 @@ settings:
   # global `ollamaThink` setting. Leave empty to inherit the global setting.
   # planOllamaThink: false
 
+  # Optional per-layer override for L2 hourly summarization model/think.
+  # Leave empty to inherit global ollamaModel/ollamaThink.
+  # l2OllamaModel: gemma4:e2b
+  # l2OllamaThink: false
+
+  # Optional per-layer override for L3 6-hour summarization model/think.
+  # Leave empty to inherit global ollamaModel/ollamaThink.
+  # l3OllamaModel: gemma4:e2b
+  # l3OllamaThink: false
+
+  # Optional per-layer override for L4 persistent-memory update model/think.
+  # Leave empty to inherit global ollamaModel/ollamaThink.
+  # l4OllamaModel: gemma4:e2b
+  # l4OllamaThink: false
+
   # Output directories
   logDir: ./logs
   captureDir: ./captures

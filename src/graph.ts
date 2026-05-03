@@ -55,6 +55,24 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
     ollamaThink: s.planOllamaThink ?? s.ollamaThink,
   };
   const planOllama = deps.ollama ?? createOllamaAdapterFromConfig(planSettings);
+  const l2Settings = {
+    ollamaModel: s.l2OllamaModel ?? s.ollamaModel,
+    ollamaBaseUrl: s.ollamaBaseUrl,
+    ollamaThink: s.l2OllamaThink ?? s.ollamaThink,
+  };
+  const l3Settings = {
+    ollamaModel: s.l3OllamaModel ?? s.ollamaModel,
+    ollamaBaseUrl: s.ollamaBaseUrl,
+    ollamaThink: s.l3OllamaThink ?? s.ollamaThink,
+  };
+  const l4Settings = {
+    ollamaModel: s.l4OllamaModel ?? s.ollamaModel,
+    ollamaBaseUrl: s.ollamaBaseUrl,
+    ollamaThink: s.l4OllamaThink ?? s.ollamaThink,
+  };
+  const l2Ollama = deps.ollama ?? createOllamaAdapterFromConfig(l2Settings);
+  const l3Ollama = deps.ollama ?? createOllamaAdapterFromConfig(l3Settings);
+  const l4Ollama = deps.ollama ?? createOllamaAdapterFromConfig(l4Settings);
   const fs = deps.fs ?? createFilesystemAdapter();
   let discord: DiscordAdapter | undefined = deps.discord;
   if (!discord && s.discordChannelId) {
@@ -123,6 +141,9 @@ export async function buildGraph(config: Config, deps: GraphDeps = {}) {
 
   const layerUpdateNode = createLayerUpdateNode({
     ollama,
+    l2Ollama,
+    l3Ollama,
+    l4Ollama,
     fs,
     logDir: s.logDir,
     store,

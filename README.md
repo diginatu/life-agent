@@ -71,10 +71,17 @@ All settings and actions are defined in `config.yml`. Use `--config <path>` to s
 Set `settings.ollamaThink: true` to enable Ollama thinking mode for all LLM calls.
 
 Plan node overrides
- - You can optionally configure the Plan node to use a different LLM model or think-mode by setting:
+  - You can optionally configure the Plan node to use a different LLM model or think-mode by setting:
    - `settings.planOllamaModel: <model>`
    - `settings.planOllamaThink: <true|false>`
- - When either `planOllamaModel` or `planOllamaThink` is not present, the Plan node will fall back to the global `settings.ollamaModel` / `settings.ollamaThink` values to preserve existing behavior.
+  - When either `planOllamaModel` or `planOllamaThink` is not present, the Plan node will fall back to the global `settings.ollamaModel` / `settings.ollamaThink` values to preserve existing behavior.
+
+Memory layer overrides
+  - You can optionally configure dedicated model/think settings for each memory layer operation:
+    - `settings.l2OllamaModel` / `settings.l2OllamaThink` for L2 hourly rollups
+    - `settings.l3OllamaModel` / `settings.l3OllamaThink` for L3 6-hour rollups
+    - `settings.l4OllamaModel` / `settings.l4OllamaThink` for L4 persistent-memory updates
+  - Any missing layer-specific setting falls back to global `settings.ollamaModel` / `settings.ollamaThink`.
 
 To add a custom action (e.g. hydration reminder), just add it to `config.yml`:
 
@@ -92,15 +99,16 @@ See `config.yml` for all available settings and their defaults.
 
 ## Pipeline
 
-The agent runs a 7-node LangGraph pipeline on each invocation:
+The agent runs an 8-node LangGraph pipeline on each invocation:
 
 1. **Capture** — grabs a webcam frame via ffmpeg
 2. **CollectFeedback** — pulls any new Discord replies since the last run
 3. **Summarize** — sends the image to Ollama for scene description
-4. **Action** — LLM selects an action using L1/L2/L3/L4 memory layers and the latest user reply
-5. **Message** — LLM drafts a notification message (if needed)
-6. **Persist** — writes JSONL log + sends Discord notification
-7. **LayerUpdate** — rolls up L1 logs into hourly L2 summaries, L2 into 6-hour L3 summaries, prunes raw L1 logs once they are safely covered by L3, and distills delayed evicted L3 entries into a single persistent L4 memory text in batches (delayed, idempotent, catches up after sleep)
+4. **Plan** — LLM drafts a short 24-hour plan from recent context and memory
+5. **Action** — LLM selects an action using L1/L2/L3/L4 memory layers and the latest user reply
+6. **Message** — LLM drafts a notification message (if needed)
+7. **Persist** — writes JSONL log + sends Discord notification
+8. **LayerUpdate** — rolls up L1 logs into hourly L2 summaries, L2 into 6-hour L3 summaries, prunes raw L1 logs once they are safely covered by L3, and distills delayed evicted L3 entries into a single persistent L4 memory text in batches (delayed, idempotent, catches up after sleep)
 
 Actions are data-driven via `config.yml`; see that file for the current set.
 

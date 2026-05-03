@@ -13,6 +13,14 @@ const SettingsSchema = z.object({
   // behavior.
   planOllamaModel: z.string().optional(),
   planOllamaThink: z.boolean().optional(),
+  // Optional per-layer overrides for memory summarization/update nodes.
+  // If not provided, each layer falls back to global ollamaModel/ollamaThink.
+  l2OllamaModel: z.string().optional(),
+  l2OllamaThink: z.boolean().optional(),
+  l3OllamaModel: z.string().optional(),
+  l3OllamaThink: z.boolean().optional(),
+  l4OllamaModel: z.string().optional(),
+  l4OllamaThink: z.boolean().optional(),
   logDir: z.string().default("./logs"),
   captureDir: z.string().default("./captures"),
   captureWidth: z.number().int().positive().default(640),
