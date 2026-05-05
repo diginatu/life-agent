@@ -104,9 +104,9 @@ Return a JSON object with exactly these fields:
 {
   "items": [
     {
-      "time": string,
+      "reason": string,
       "action": one of ${JSON.stringify(schedulableActions)},
-      "reason": string
+      "time": string
     }
   ]
 }
