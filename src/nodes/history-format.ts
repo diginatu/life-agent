@@ -6,8 +6,8 @@ export type UserFeedbackEntry = z.infer<typeof UserFeedbackSchema>[number];
 
 export interface LogEntry {
   timestamp?: string;
-  summary?: { activityGuess?: string | null; posture?: string; [key: string]: unknown };
-  decision?: { actions?: string[]; action?: string; reason?: string; [key: string]: unknown };
+  summary?: { activityGuess?: string | null; posture?: string;[key: string]: unknown };
+  decision?: { actions?: string[]; action?: string; reason?: string;[key: string]: unknown };
   message?: { body?: string } | null;
   feedbackFromPrevious?: { text: string; userId: string; timestamp: string }[];
   tags?: string[];
@@ -65,7 +65,7 @@ export function formatHistory(entries: LogEntry[], now?: Date): { history: strin
         : [];
     const action = actions.length > 0 ? actions.join(",") : "unknown";
     const reason = e.decision?.reason ?? "";
-    let line = `  ${time}${relativeSuffix} | ${posture}, ${activity} → ${action}${reason ? ` (${reason})` : ""}`;
+    let line = `  ${time}${relativeSuffix} | ${posture}, ${activity} → Action: ${action}${action != "none" && reason ? ` (${reason})` : ""}`;
     if (e.feedbackFromPrevious && e.feedbackFromPrevious.length > 0) {
       const replies = e.feedbackFromPrevious
         .map((f) => formatFeedbackLine(f, now))

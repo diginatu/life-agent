@@ -10,7 +10,7 @@ export interface L2Entry {
 }
 
 /** Summarize L1 log entries into an L2 hourly summary. */
-export async function summarizeLayer(
+export async function summarizeL2(
   ollama: OllamaAdapter,
   entries: LogEntry[],
   windowLabel: string,

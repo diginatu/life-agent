@@ -7,7 +7,7 @@ import {
   L4_KEY,
   L4_NAMESPACE,
 } from "../memory/constants.ts";
-import { summarizeL3, summarizeLayer } from "../memory/summarize-layer.ts";
+import { summarizeL3, summarizeL2 } from "../memory/summarize-layer.ts";
 import { type EvictedL3Entry, updateL4 } from "../memory/update-l4.ts";
 import type { LogEntry } from "./history-format.ts";
 
@@ -119,7 +119,7 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         continue;
       }
 
-      const content = await summarizeLayer(l2Ollama, entries, key);
+      const content = await summarizeL2(l2Ollama, entries, key);
 
       await deps.store.put(L2_NAMESPACE as unknown as string[], key, {
         content,
@@ -210,10 +210,10 @@ export function createLayerUpdateNode(deps: LayerUpdateNodeDeps) {
         const l4SourceCount =
           (existingL4?.value as { sourceCount?: number } | null)?.sourceCount ?? 0;
         const evicted = l4Eligible.map((item) => item.value as EvictedL3Entry);
-          const newContent = await updateL4(
-            l4Ollama,
-            l4Content,
-            evicted,
+        const newContent = await updateL4(
+          l4Ollama,
+          l4Content,
+          evicted,
           deps.l4UpdatePrompt ?? DEFAULT_L4_PROMPT,
           deps.l4MaxChars ?? DEFAULT_L4_MAX_CHARS,
         );
