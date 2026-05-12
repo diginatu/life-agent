@@ -55,12 +55,26 @@ export function createFilesystemAdapter(): FilesystemAdapter {
     },
 
     async readEntriesSince(logDir, sinceIso, maxDays = 14) {
-      const result: unknown[] = [];
-      const today = new Date();
+      const since = new Date(sinceIso);
+      if (Number.isNaN(since.getTime())) {
+        throw new Error(`Invalid readEntriesSince cutoff: ${sinceIso}`);
+      }
 
-      for (let i = 0; i <= maxDays; i++) {
-        const d = new Date(today);
-        d.setUTCDate(d.getUTCDate() - i);
+      if (maxDays < 0) {
+        return [];
+      }
+
+      const result: unknown[] = [];
+      const startDay = new Date(Date.UTC(since.getUTCFullYear(), since.getUTCMonth(), since.getUTCDate()));
+
+      const today = new Date();
+      const todayDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+
+      const maxDay = new Date(startDay);
+      maxDay.setUTCDate(maxDay.getUTCDate() + maxDays);
+      const endDay = maxDay < todayDay ? maxDay : todayDay;
+
+      for (let d = new Date(startDay); d <= endDay; d.setUTCDate(d.getUTCDate() + 1)) {
         const dateStr = d.toISOString().slice(0, 10);
         const entries = await this.readAllLinesForDay(logDir, dateStr);
 
@@ -69,12 +83,7 @@ export function createFilesystemAdapter(): FilesystemAdapter {
           return entry.timestamp != null && entry.timestamp > sinceIso;
         });
 
-        result.unshift(...newer);
-
-        // Stop scanning if all entries on this day are <= sinceIso
-        if (entries.length > 0 && newer.length === 0) {
-          break;
-        }
+        result.push(...newer);
       }
 
       return result;
