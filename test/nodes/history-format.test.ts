@@ -94,6 +94,31 @@ describe("formatHistory", () => {
     expect(history).toContain("sitting, coding");
   });
 
+  test("omits reason when action is none", () => {
+    const { history } = formatHistory([
+      {
+        timestamp: agoIso(15 * 60_000),
+        summary: { activityGuess: "idle", posture: "sitting" },
+        decision: { action: "none", reason: "should not appear" },
+      },
+    ], NOW);
+
+    expect(history).toContain("Action: none");
+    expect(history).not.toContain("should not appear");
+  });
+
+  test("keeps reason when action is taken", () => {
+    const { history } = formatHistory([
+      {
+        timestamp: agoIso(20 * 60_000),
+        summary: { activityGuess: "coding", posture: "sitting" },
+        decision: { action: "nudge_break", reason: "break time" },
+      },
+    ], NOW);
+
+    expect(history).toContain("Action: nudge_break (break time)");
+  });
+
   test("includes local datetime and relative age for user replies in recent history", () => {
     const replyTs = "2026-04-18T14:20:00.000Z";
     const { history } = formatHistory(

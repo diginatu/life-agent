@@ -267,7 +267,7 @@ describe("message node with memory layers", () => {
     expect(capturedPrompt).toContain("Hourly overview");
     expect(capturedPrompt).toContain("L2 msg hour 6");
     expect(capturedPrompt).toContain("Recent history");
-    expect(capturedPrompt).toContain("l1 msg entry");
+    expect(capturedPrompt).not.toContain("l1 msg entry");
   });
 
   test("memory timestamps in prompt are shown in local time", async () => {

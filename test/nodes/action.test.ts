@@ -613,7 +613,8 @@ describe("action node with L2/L3 memory layers", () => {
     expect(capturedPrompt).toContain("L2 hour 6"); // windowStart == L3.windowEnd, >= so included
     expect(capturedPrompt).not.toContain("L2 hour 4"); // windowStart < L3.windowEnd, excluded
     expect(capturedPrompt).toContain("Recent history");
-    expect(capturedPrompt).toContain("l1 entry one");
+    expect(capturedPrompt).not.toContain("l1 entry one");
+    expect(capturedPrompt).toContain("l1 entry two");
   });
 
   test("No L3: all L2 entries appear in prompt", async () => {
@@ -690,7 +691,7 @@ describe("action node with L2/L3 memory layers", () => {
 
     expect(capturedSince).toBe("2026-04-14T08:00:00.000Z");
     expect(capturedPrompt).toContain("Recent history");
-    expect(capturedPrompt).toContain("no l2 entry");
+    expect(capturedPrompt).not.toContain("no l2 entry");
   });
 
   test("L1 cutoff is taken from latestL2WindowEnd (not L3)", async () => {
